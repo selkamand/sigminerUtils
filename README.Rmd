@@ -32,7 +32,7 @@ You can install the development version of sigminerUtils like so:
 
 ``` r
 # install.packages('remotes')
-remotes::install_packages('sigminerUtils')
+remotes::install_github('selkamand/sigminerUtils')
 ```
 
 ## Usage
