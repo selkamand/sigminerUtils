@@ -37,7 +37,7 @@ signature_directory_to_table <- function(signature_directory){
 #' @export
 #'
 sig_create_database <- function(sqlite_db, overwrite = TRUE){
-  path_sql <- system.file('R/CreateSignatureDB.sql', package = "sigminerUtils")
+  path_sql <- system.file('sql/CreateSignatureDB.sql', package = "sigminerUtils")
 
   cli::cli_h2('Create Signature Database')
 
