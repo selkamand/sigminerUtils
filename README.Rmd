@@ -1,0 +1,51 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# sigminerUtils
+
+<!-- badges: start -->
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![CRAN status](https://www.r-pkg.org/badges/version/sigminerUtils)](https://CRAN.R-project.org/package=sigminerUtils)
+<!-- badges: end -->
+
+
+Utility package to simplify the process of running sigminer, storing signature results and producing key visualisations
+
+*Warning:* This package is in early development and not ready for use
+
+
+## Installation
+
+You can install the development version of sigminerUtils like so:
+
+``` r
+# install.packages('remotes')
+remotes::install_packages('sigminerUtils')
+```
+
+## Usage
+
+1. Start by creating a Signature database
+
+`sig_create_database('./my_sig_database.sqlite')`
+
+2. Run Signature Analysis
+
+`sig_analyse_cosmic_v3('./signatures')`
+
+
+3. Load results from output folder into the database
+
+`sig_add_to_database('./signatures', './my_sig_database.sqlite')`
