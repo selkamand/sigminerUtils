@@ -35,7 +35,6 @@ signature_directory_to_table <- function(signature_directory){
 #'
 #' @return invisible(NULL) run for its side effects
 #' @export
-#'
 sig_create_database <- function(sqlite_db, overwrite = TRUE){
   path_sql <- system.file('sql/CreateSignatureDB.sql', package = "sigminerUtils")
 
@@ -78,15 +77,22 @@ sig_create_database <- function(sqlite_db, overwrite = TRUE){
 #'
 #' @param signature_directory path to the directory produced by [sig_analyse_mutations()]
 #' @param sqlite_db path to the sqlite database produced by [(sig_create_database)]
-#'
+#' @param ref reference genome: one of hg19 or hg38 (string)
 #' @return invisible(NULL). This function is run for its side effects
 #' @export
 #'
-sig_add_to_database <- function(signature_directory, sqlite_db){
+sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", "hg38")){
   assertions::assert_directory_exists(signature_directory)
   assertions::assert_file_exists(sqlite_db)
+  ref <- rlang::arg_match(ref)
 
   df_files <- signature_directory_to_table(signature_directory)
+
+  #refs_found <- unique(df_files[['reference_genome']])
+
+  df_files <- df_files |> dplyr::filter(reference_genome == ref)
+
+  assertions::assert_greater_than(nrow(df_files), minimum = 0, msg = "Failed to find any signature files for ref genome {ref} in {.path signature_directory}")
 
   # Exposure tables
   cli::cli_progress_step("Reading data from {.path {signature_directory}}")
@@ -96,6 +102,8 @@ sig_add_to_database <- function(signature_directory, sqlite_db){
     dplyr::pull(filepath) |>
     readr::read_csv()
 
+  #browser()
+
   df_exposures <- df_exposures |>
     dplyr::rename(method=Method,
                   sampleId = SampleID,
@@ -104,6 +112,7 @@ sig_add_to_database <- function(signature_directory, sqlite_db){
                   contributionRelative = ContributionRelative,
                   optimal = IsOptimal,
                   type = Type)
+
 
   cli::cli_progress_step("Connecting to the signature database {.path {sqlite_db}}")
   con <- RSQLite::dbConnect(drv = RSQLite::SQLite(), sqlite_db)
