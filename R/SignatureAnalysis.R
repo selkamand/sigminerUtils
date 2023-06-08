@@ -139,15 +139,15 @@ sig_analyse_mutations <- function(maf, somatic_ids, ref = c('hg38', 'hg19'), out
   }
 
   fix_decomposition(sbs_96_matrices) |>
-    write.csv(file = outfile_sbs96_decompositions, row.names = FALSE)
+    utils::write.csv(file = outfile_sbs96_decompositions, row.names = FALSE)
   cli::cli_alert_success("SBS96 decomposition written to csv: {.path {outfile_sbs96_decompositions}}")
 
   fix_decomposition(id_83_matrices) |>
-    write.csv(file = outfile_id83_decompositions, row.names = FALSE)
+    utils::write.csv(file = outfile_id83_decompositions, row.names = FALSE)
   cli::cli_alert_success("ID83 decomposition written to csv: {.path {outfile_id83_decompositions}}")
 
   fix_decomposition(dbs_78_matrices) |>
-    write.csv(file = outfile_dbs78_decompositions, row.names = FALSE)
+    utils::write.csv(file = outfile_dbs78_decompositions, row.names = FALSE)
   cli::cli_alert_success("DBS_78 decomposition written to csv: {.path {outfile_dbs78_decompositions}}")
 
 
@@ -197,7 +197,7 @@ sig_analyse_mutations <- function(maf, somatic_ids, ref = c('hg38', 'hg19'), out
       else if(fit_metric == "p_val")
         res <- bootstrap_pluck_pval(fit)
 
-      write.csv(res, tmp_outfile, row.names = FALSE)
+      utils::write.csv(res, tmp_outfile, row.names = FALSE)
       cli::cli_alert_success("{fit_type} model fit [{fit_metric}] has been written to csv: {.path {tmp_outfile}}")
     }
   }
