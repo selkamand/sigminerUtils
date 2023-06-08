@@ -24,3 +24,5 @@ Imports:
     tibble,
     tidyr,
     utils
+URL: https://github.com/selkamand/sigminerUtils
+BugReports: https://github.com/selkamand/sigminerUtils/issues
