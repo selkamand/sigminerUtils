@@ -92,17 +92,15 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
 
   df_files <- df_files |> dplyr::filter(reference_genome == ref)
 
-  assertions::assert_greater_than(nrow(df_files), minimum = 0, msg = "Failed to find any signature files for ref genome {ref} in {.path signature_directory}")
+  assertions::assert_greater_than(nrow(df_files), minimum = 0, msg = "Failed to find any signature files for ref genome {ref} in {.path {signature_directory}}")
 
-  # Exposure tables
   cli::cli_progress_step("Reading data from {.path {signature_directory}}")
 
+  # Exposure
   df_exposures <-  df_files |>
     dplyr::filter(output_type == "exposures") |>
     dplyr::pull(filepath) |>
     readr::read_csv()
-
-  #browser()
 
   df_exposures <- df_exposures |>
     dplyr::rename(method=Method,
@@ -114,11 +112,90 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
                   type = Type)
 
 
+  # Decompositions
+  df_decomposition <-  df_files |>
+    dplyr::filter(output_type == "decomposition") |>
+    dplyr::pull(filepath) |>
+    readr::read_csv(id = 'class')
+
+  df_decomposition <- df_decomposition |>
+    dplyr::rename(
+      sampleId = "SampleID",
+      channel = "Context",
+      count = "Count",
+      fraction = "CountRelative"
+      ) |>
+    dplyr::mutate(class = sub(x=basename(class), pattern = "_.*",replacement = ""))
+
+  # cosmicErrorAndCosine
+  df_error <- df_files |>
+    dplyr::filter(output_type == "error") |>
+    dplyr::pull(filepath) |>
+    readr::read_csv(id = 'class')
+
+  df_cosine <- df_files |>
+    dplyr::filter(output_type == "cosine") |>
+    dplyr::pull(filepath) |>
+    readr::read_csv(id = 'class')
+
+  df_error <- df_error |>
+    dplyr::rename(
+      sampleId = "SampleID",
+      method = "Method",
+      type = "Type",
+      optimal = "IsOptimal",
+      error = "Errors"
+      ) |>
+    dplyr::mutate(class = sub(x=basename(class), pattern = "_.*",replacement = ""))
+
+  df_cosine <- df_cosine |>
+    dplyr::rename(
+      sampleId = "SampleID",
+      method = "Method",
+      type = "Type",
+      optimal = "IsOptimal",
+      cosine = "Cosine"
+    ) |>
+    dplyr::mutate(
+      class = sub(x=basename(class), pattern = "_.*",replacement = "")
+    )
+
+  df_error_and_cosine <- dplyr::left_join(df_error, df_cosine, by = dplyr::join_by(class, sampleId, method, type, optimal), keep = FALSE)
+
+  # pVal
+  df_pval <- df_files |>
+    dplyr::filter(output_type == "p_val") |>
+    dplyr::pull(filepath) |>
+    readr::read_csv(id = 'class')
+
+  df_pval <- df_pval |>
+    dplyr::rename(
+      sampleId = "SampleID",
+      method = "Method",
+      signature = "Sig",
+      threshold = "Threshold",
+      p = "Pvalue"
+    ) |>
+    dplyr::mutate(
+      class = sub(x=basename(class), pattern = "_.*",replacement = "")
+    )
+
   cli::cli_progress_step("Connecting to the signature database {.path {sqlite_db}}")
   con <- RSQLite::dbConnect(drv = RSQLite::SQLite(), sqlite_db)
 
   cli::cli_progress_step("Appending exposure data to database {.path {sqlite_db}}")
   DBI::dbWriteTable(conn = con, name = "cosmicExposures", df_exposures, append = TRUE, row.names = FALSE)
+
+  cli::cli_progress_step("Appending decomposition data to database {.path {sqlite_db}}")
+  DBI::dbWriteTable(conn = con, name = "decompositions", df_decomposition, append = TRUE, row.names = FALSE)
+
+  cli::cli_progress_step("Appending error and cosine data to database {.path {sqlite_db}}")
+  DBI::dbWriteTable(conn = con, name = "cosmicErrorAndCosine", df_error_and_cosine, append = TRUE, row.names = FALSE)
+
+  cli::cli_progress_step("Appending P-value data to database {.path {sqlite_db}}")
+  DBI::dbWriteTable(conn = con, name = "cosmicPvalues", df_pval, append = TRUE, row.names = FALSE)
+
+
 
   return(invisible(NULL))
 }
