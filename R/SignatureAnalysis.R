@@ -33,6 +33,7 @@ sig_analyse_mutations <- function(maf, somatic_ids, ref = c('hg38', 'hg19'), out
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
 
+
   ref <- rlang::arg_match(ref)
   exposure_type <- rlang::arg_match(exposure_type)
 
@@ -138,6 +139,7 @@ sig_analyse_mutations <- function(maf, somatic_ids, ref = c('hg38', 'hg19'), out
       dplyr::relocate(SampleID)
   }
 
+  # Add class column
   fix_decomposition(sbs_96_matrices) |>
     utils::write.csv(file = outfile_sbs96_decompositions, row.names = FALSE)
   cli::cli_alert_success("SBS96 decomposition written to csv: {.path {outfile_sbs96_decompositions}}")
