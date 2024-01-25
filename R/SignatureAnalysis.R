@@ -24,11 +24,18 @@ prepare_matrix <- function(decomp, sample_id = NULL){
 #' @param exposure_type The type of exposure. Can be "absolute" or "relative". One of "absolute" or "relative"
 #' @param n_bootstraps The number of bootstrap iterations for fitting signatures. Default is 100.
 #' @param temp_dir The temporary directory for storing intermediate files. Default is tempdir().
+#' @param db_sbs a signature collection data.frame where rows are channels and columns are signatures.
+#' @param db_indel a signature collection data.frame where rows are channels and columns are signatures.
+#' @param db_dbs a signature collection data.frame where rows are channels and columns are signatures.
 #'
 #' @return None.
 #' @export
+#' @importFrom rlang `%||%`
 #'
-sig_analyse_mutations <- function(maf, somatic_ids, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir()){
+#' @details
+#'
+#'
+sig_analyse_mutations <- function(maf, somatic_ids, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir()){
 
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
@@ -37,6 +44,27 @@ sig_analyse_mutations <- function(maf, somatic_ids, ref = c('hg38', 'hg19'), out
   ref <- rlang::arg_match(ref)
   exposure_type <- rlang::arg_match(exposure_type)
 
+
+  # Define default signature collections based on reference genome
+  if(ref == "hg38"){
+    default_sbs =  sigstash::sig_load("COSMIC_v3.3.1_SBS_GRCh38", format = "sigminer")
+    default_indel = sigstash::sig_load("COSMIC_v3.3_ID_GRCh37", format = "sigminer") # no hg38 renormalised data is available in cosmic
+    default_dbs = sigstash::sig_load("COSMIC_v3.3_DBS_GRCh37", format = "sigminer") #no hg38 renormalised data is available in cosmic
+  }
+  else if (ref == "hg19"){
+    default_sbs = sigstash::sig_load("COSMIC_v3.3.1_SBS_GRCh37", format = "sigminer")
+    default_indel = sigstash::sig_load("COSMIC_v3.3_ID_GRCh37", format = "sigminer")
+    default_dbs = sigstash::sig_load("COSMIC_v3.3_DBS_GRCh37", format = "sigminer")
+  }
+  else
+    stop('Unexpected value of ref: ', ref)
+
+  # Set signaure collection to defaults if null.
+  db_sbs <- db_sbs %||% default_sbs
+  db_indel <- db_indel %||% default_indel
+  db_dbs <- db_dbs %||% default_dbs
+
+  # Pick appropriate reference gene
   if(ref == "hg19"){
     ref_genome <- "BSgenome.Hsapiens.UCSC.hg19"
   }else if (ref == "hg38"){
@@ -65,14 +93,23 @@ sig_analyse_mutations <- function(maf, somatic_ids, ref = c('hg38', 'hg19'), out
   id_83_matrices <- prepare_matrix(decompositions$ID_83, sample_id = somatic_ids)
   dbs_78_matrices <- prepare_matrix(decompositions$DBS_78, sample_id = somatic_ids)
 
+  # Sort Signature databases so that rows match out sample catalogues
+  db_sbs <- sort_so_rownames_match(db_sbs, rowname_desired_order = rownames(sbs_96_matrices))
+  db_indel <- sort_so_rownames_match(db_indel, rowname_desired_order = rownames(id_83_matrices))
+  db_dbs <- sort_so_rownames_match(db_dbs, rowname_desired_order = rownames(dbs_78_matrices))
+
+  assertions::assert_identical(rownames(sbs_96_matrices), rownames(db_sbs))
+  assertions::assert_identical(rownames(id_83_matrices), rownames(db_indel))
+  assertions::assert_identical(rownames(dbs_78_matrices), rownames(db_dbs))
 
 
   cli::cli_h3("Single Base Substitutions (SBS96)")
   # Single Base Substitution
   sbs96_fit <- sigminer::sig_fit_bootstrap_batch(
     catalog = sbs_96_matrices,
-    sig_db = "SBS",  # Use 'legacy' for V2 or 'SBS' for V3
-    sig_index= "ALL",
+    sig = db_sbs,
+    #sig_db = "SBS",  # Use 'legacy' for V2 or 'SBS' for V3
+    #sig_index= "ALL",
     n = n_bootstraps,
     method = "QP",
     min_count = 1L,
@@ -89,8 +126,9 @@ sig_analyse_mutations <- function(maf, somatic_ids, ref = c('hg38', 'hg19'), out
   ## Indel
   id83_fit <- sigminer::sig_fit_bootstrap_batch(
     catalog = id_83_matrices,
-    sig_db = "ID",  # Use 'legacy' for V2
-    sig_index= "ALL",
+    sig = db_indel,
+    #sig_db = "ID",  # Use 'legacy' for V2
+    sig_index= NULL,
     n = n_bootstraps,
     method = "QP",
     min_count = 1L,
@@ -106,8 +144,9 @@ sig_analyse_mutations <- function(maf, somatic_ids, ref = c('hg38', 'hg19'), out
   cli::cli_h3("Doublet Mutations (DBS78)")
   dbs78_fit <- sigminer::sig_fit_bootstrap_batch(
     catalog = dbs_78_matrices,
-    sig_db = "DBS",  # Use 'legacy' for V2
-    sig_index= "ALL",
+    sig = db_dbs,
+    #sig_db = "DBS",  # Use 'legacy' for V2
+    #sig_index= "ALL",
     n = n_bootstraps,
     method = "QP",
     min_count = 1L,
@@ -209,3 +248,12 @@ sig_analyse_mutations <- function(maf, somatic_ids, ref = c('hg38', 'hg19'), out
   write_model_outputs(fit = id83_fit, fit_type = "ID83", output_dir = output_dir, ref = ref)
 }
 
+
+sort_so_rownames_match <- function(data, rowname_desired_order){
+  assertions::assert(nrow(data) == length(rowname_desired_order), msg = "Number of sample catalog rows must be equal to rows of signature collection dataframe")
+  rnames = rownames(data)
+  indexes = match(rowname_desired_order, rnames)
+  assertions::assert_no_missing(indexes, msg = "Sample Catalog Matrix contains rows not present in the signature collection dataframe")
+
+  return(data[indexes,])
+}
