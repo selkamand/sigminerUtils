@@ -80,7 +80,6 @@ sig_create_database <- function(sqlite_db, overwrite = TRUE){
 #' @param ref reference genome: one of hg19 or hg38 (string)
 #' @return invisible(NULL). This function is run for its side effects
 #' @export
-#'
 sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", "hg38")){
   assertions::assert_directory_exists(signature_directory)
   assertions::assert_file_exists(sqlite_db)
