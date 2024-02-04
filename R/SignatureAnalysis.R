@@ -1,15 +1,5 @@
 # Utilities --------------------------------------------------------
 
-prepare_matrix <- function(decomp, sample_id = NULL){
-  if(is.vector(decomp)){
-    res <- as.matrix(decomp)
-    colnames(res) <- sample_id
-    return(res)
-  }
-  else
-    return(t(decomp))
-
-}
 
 # Mutational Signature Analysis -------------------------------------------
 
@@ -18,7 +8,6 @@ prepare_matrix <- function(decomp, sample_id = NULL){
 #' Run all signature mutation analyses possible from MAF inputs on
 #'
 #' @param maf The input MAF file.
-#' @param somatic_ids A vector of sample IDs for somatic mutations.
 #' @param ref A character vector specifying the reference genome. One of 'hg38' or 'hg19'.
 #' @param output_dir The output directory for storing results. Default is "./signatures".
 #' @param exposure_type The type of exposure. Can be "absolute" or "relative". One of "absolute" or "relative"
@@ -32,10 +21,9 @@ prepare_matrix <- function(decomp, sample_id = NULL){
 #' @export
 #' @importFrom rlang `%||%`
 #'
-#' @details
 #'
 #'
-sig_analyse_mutations <- function(maf, somatic_ids, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir()){
+sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir()){
 
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
@@ -89,9 +77,9 @@ sig_analyse_mutations <- function(maf, somatic_ids, db_sbs = NULL, db_indel = NU
   )
 
   cli::cli_h2("Fitting")
-  sbs_96_matrices <- prepare_matrix(decompositions$SBS_96, sample_id = somatic_ids)
-  id_83_matrices <- prepare_matrix(decompositions$ID_83, sample_id = somatic_ids)
-  dbs_78_matrices <- prepare_matrix(decompositions$DBS_78, sample_id = somatic_ids)
+  sbs_96_matrices <- t(decompositions$SBS_96)
+  id_83_matrices <- t(decompositions$ID_83)
+  dbs_78_matrices <- t(decompositions$DBS_78)
 
   # Sort Signature databases so that rows match out sample catalogues
   db_sbs <- sort_so_rownames_match(db_sbs, rowname_desired_order = rownames(sbs_96_matrices))

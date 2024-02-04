@@ -6,7 +6,6 @@
 \usage{
 sig_analyse_mutations(
   maf,
-  somatic_ids,
   db_sbs = NULL,
   db_indel = NULL,
   db_dbs = NULL,
@@ -20,7 +19,11 @@ sig_analyse_mutations(
 \arguments{
 \item{maf}{The input MAF file.}
 
-\item{somatic_ids}{A vector of sample IDs for somatic mutations.}
+\item{db_sbs}{a signature collection data.frame where rows are channels and columns are signatures.}
+
+\item{db_indel}{a signature collection data.frame where rows are channels and columns are signatures.}
+
+\item{db_dbs}{a signature collection data.frame where rows are channels and columns are signatures.}
 
 \item{ref}{A character vector specifying the reference genome. One of 'hg38' or 'hg19'.}
 
