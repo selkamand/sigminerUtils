@@ -17,7 +17,7 @@ sig_analyse_mutations(
 )
 }
 \arguments{
-\item{maf}{The input MAF file.}
+\item{maf}{The input MAF file. Can be a maf object or the path to a MAF file}
 
 \item{db_sbs}{a signature collection data.frame where rows are channels and columns are signatures.}
 

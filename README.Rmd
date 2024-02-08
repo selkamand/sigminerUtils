@@ -39,13 +39,25 @@ remotes::install_github('selkamand/sigminerUtils')
 
 1. Start by creating a Signature database
 
-`sig_create_database('./my_sig_database.sqlite')`
+```{r, eval = FALSE}
+sig_create_database('./my_sig_database.sqlite', overwrite = TRUE)
+```
+
 
 2. Run Signature Analysis
 
-`sig_analyse_cosmic_v3('./signatures')`
+```{r, eval = FALSE}
+path_maf <- system.file(package = "sigminerUtils", path = "test.maf")
+
+sig_analyse_mutations(maf = path_maf, ref = "hg19")
+```
+
+``
 
 
 3. Load results from output folder into the database
 
-`sig_add_to_database('./signatures', './my_sig_database.sqlite')`
+```{r, eval = FALSE}
+sig_add_to_database('./signatures', './my_sig_database.sqlite')
+```
+

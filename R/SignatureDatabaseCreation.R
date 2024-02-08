@@ -76,7 +76,7 @@ sig_create_database <- function(sqlite_db, overwrite = TRUE){
 #' Load signature data into sqlite DB
 #'
 #' @param signature_directory path to the directory produced by [sig_analyse_mutations()]
-#' @param sqlite_db path to the sqlite database produced by [(sig_create_database)]
+#' @param sqlite_db path to the sqlite database produced by [sig_create_database()]
 #' @param ref reference genome: one of hg19 or hg38 (string)
 #' @return invisible(NULL). This function is run for its side effects
 #' @export
@@ -99,7 +99,7 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
   df_exposures <-  df_files |>
     dplyr::filter(output_type == "exposures") |>
     dplyr::pull(filepath) |>
-    readr::read_csv()
+    readr::read_csv(show_col_types = FALSE)
 
   df_exposures <- df_exposures |>
     dplyr::rename(method=Method,
@@ -115,7 +115,7 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
   df_decomposition <-  df_files |>
     dplyr::filter(output_type == "decomposition") |>
     dplyr::pull(filepath) |>
-    readr::read_csv(id = 'class')
+    readr::read_csv(id = 'class', show_col_types = FALSE)
 
   df_decomposition <- df_decomposition |>
     dplyr::rename(
@@ -130,12 +130,12 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
   df_error <- df_files |>
     dplyr::filter(output_type == "error") |>
     dplyr::pull(filepath) |>
-    readr::read_csv(id = 'class')
+    readr::read_csv(id = 'class', show_col_types = FALSE)
 
   df_cosine <- df_files |>
     dplyr::filter(output_type == "cosine") |>
     dplyr::pull(filepath) |>
-    readr::read_csv(id = 'class')
+    readr::read_csv(id = 'class', show_col_types = FALSE)
 
   df_error <- df_error |>
     dplyr::rename(
@@ -165,7 +165,7 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
   df_pval <- df_files |>
     dplyr::filter(output_type == "p_val") |>
     dplyr::pull(filepath) |>
-    readr::read_csv(id = 'class')
+    readr::read_csv(id = 'class', show_col_types = FALSE)
 
   df_pval <- df_pval |>
     dplyr::rename(
@@ -194,7 +194,10 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
   cli::cli_progress_step("Appending P-value data to database {.path {sqlite_db}}")
   DBI::dbWriteTable(conn = con, name = "cosmicPvalues", df_pval, append = TRUE, row.names = FALSE)
 
-
+  # After other data is written: compute pairwise-similarity for any new samples vs all old samples
+  df_pairwise_sim <- sig_pairwise_similarity(sqlite_db, verbose = FALSE)
+  cli::cli_progress_step("Appending pairwise-similarity data to database {.path {sqlite_db}}")
+  DBI::dbWriteTable(conn = con, name = "pairwiseSimilarity", df_pairwise_sim, append = TRUE, row.names = FALSE)
 
   return(invisible(NULL))
 }

@@ -7,7 +7,7 @@
 #'
 #' Run all signature mutation analyses possible from MAF inputs on
 #'
-#' @param maf The input MAF file.
+#' @param maf The input MAF file. Can be a maf object or the path to a MAF file
 #' @param ref A character vector specifying the reference genome. One of 'hg38' or 'hg19'.
 #' @param output_dir The output directory for storing results. Default is "./signatures".
 #' @param exposure_type The type of exposure. Can be "absolute" or "relative". One of "absolute" or "relative"
@@ -67,6 +67,9 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
   }
   cli::cli_alert_info("Output Directory: {.path {output_dir}}")
   cli::cli_alert_info("Reference Genome: {.strong {ref_genome}}")
+
+  # Read MAF file if supplied as filepath
+  maf <- sigminer::read_maf_minimal(readr::read_tsv(maf, show_col_types = FALSE))
 
   cli::cli_h2("Decomposition")
   decompositions <- sigminer::sig_tally(

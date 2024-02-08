@@ -9,7 +9,7 @@ sig_add_to_database(signature_directory, sqlite_db, ref = c("hg19", "hg38"))
 \arguments{
 \item{signature_directory}{path to the directory produced by \code{\link[=sig_analyse_mutations]{sig_analyse_mutations()}}}
 
-\item{sqlite_db}{path to the sqlite database produced by \link{(sig_create_database)}}
+\item{sqlite_db}{path to the sqlite database produced by \code{\link[=sig_create_database]{sig_create_database()}}}
 
 \item{ref}{reference genome: one of hg19 or hg38 (string)}
 }
