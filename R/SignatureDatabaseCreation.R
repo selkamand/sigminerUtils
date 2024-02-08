@@ -77,9 +77,10 @@ sig_create_database <- function(sqlite_db, overwrite = TRUE){
 #' @param signature_directory path to the directory produced by [sig_analyse_mutations()]
 #' @param sqlite_db path to the sqlite database produced by [sig_create_database()]
 #' @param ref reference genome: one of hg19 or hg38 (string)
+#' @param metadata a sample-level data.frame with columns sampleId, disease and description. If not supplied will be automatically generated.
 #' @return invisible(NULL). This function is run for its side effects
 #' @export
-sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", "hg38")){
+sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", "hg38"), metadata = NULL){
   assertions::assert_directory_exists(signature_directory)
   assertions::assert_file_exists(sqlite_db)
   ref <- rlang::arg_match(ref)
@@ -178,8 +179,45 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
       class = sub(x=basename(class), pattern = "_.*",replacement = "")
     )
 
+
+  # Sample Metadata
+  unique_samples_in_decomposition_csv = unique(df_decomposition[['sampleId']])
+
+  if(is.null(metadata)){
+    metadata <- dplyr::tibble(
+     sampleId = unique_samples_in_decomposition_csv,
+     disease = rep("not_indicated", times = length(unique_samples_in_decomposition_csv)),
+     description = character(length(unique_samples_in_decomposition_csv))
+    )
+  }
+  else{ # If user supplies metadata data.frame
+    assertions::assert_dataframe(metadata)
+    assertions::assert_names_include(metadata, c('sampleId','disease', 'description'))
+
+    # If we're missing sample Ids in our metadata, flag it here
+    assertions::assert_subset(
+      unique_samples_in_decomposition_csv,
+      metadata[['sampleId']],
+      msg = ""
+    )
+
+    metadata <- metadata |>
+      dplyr::select(sampleId, disease, description)
+  }
+
+  # Drop metadata rows not in decomposition table so that users can
+  # supply metadata for a full cohort when mutsig analysis is performed only on a subset -
+  # but just adds the metadata corresponding to those analysed samples to the sample table
+  metadata <- metadata |>
+    dplyr::filter(sampleId %in% unique_samples_in_decomposition_csv)
+
+  # Write to Database
+
   cli::cli_progress_step("Connecting to the signature database {.path {sqlite_db}}")
   con <- RSQLite::dbConnect(drv = RSQLite::SQLite(), sqlite_db)
+
+  cli::cli_progress_step("Appending sample metadata table {.path {sqlite_db}}")
+  DBI::dbWriteTable(conn = con, name = "sample", metadata, append = TRUE, row.names = FALSE)
 
   cli::cli_progress_step("Appending exposure data to database {.path {sqlite_db}}")
   DBI::dbWriteTable(conn = con, name = "cosmicExposures", df_exposures, append = TRUE, row.names = FALSE)

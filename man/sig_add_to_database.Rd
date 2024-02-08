@@ -4,7 +4,12 @@
 \alias{sig_add_to_database}
 \title{Add data to sqlite DB}
 \usage{
-sig_add_to_database(signature_directory, sqlite_db, ref = c("hg19", "hg38"))
+sig_add_to_database(
+  signature_directory,
+  sqlite_db,
+  ref = c("hg19", "hg38"),
+  metadata = NULL
+)
 }
 \arguments{
 \item{signature_directory}{path to the directory produced by \code{\link[=sig_analyse_mutations]{sig_analyse_mutations()}}}
@@ -12,6 +17,8 @@ sig_add_to_database(signature_directory, sqlite_db, ref = c("hg19", "hg38"))
 \item{sqlite_db}{path to the sqlite database produced by \code{\link[=sig_create_database]{sig_create_database()}}}
 
 \item{ref}{reference genome: one of hg19 or hg38 (string)}
+
+\item{metadata}{a sample-level data.frame with columns sampleId, disease and description. If not supplied will be automatically generated.}
 }
 \value{
 invisible(NULL). This function is run for its side effects

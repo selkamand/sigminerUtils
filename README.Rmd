@@ -58,6 +58,18 @@ sig_analyse_mutations(maf = path_maf, ref = "hg19")
 3. Load results from output folder into the database
 
 ```{r, eval = FALSE}
-sig_add_to_database('./signatures', './my_sig_database.sqlite')
+sig_add_to_database('./signatures', './my_sig_database.sqlite', ref = "hg19")
 ```
+Note you can optionally supply sample metadata
+
+```{r, eval = FALSE}
+sample_metadata <- data.frame(
+  sampleId = c('TCGA-A2-A0T5-01', 'TCGA-CA-6717-01', 'TCGA-CF-A9FF-01'),
+  disease = c('Breast', 'Colorectal', 'Bladder'),
+  description = character(3)
+)
+
+sig_add_to_database('./signatures', './my_sig_database.sqlite', ref = "hg19", metadata = sample_metadata)
+```
+
 

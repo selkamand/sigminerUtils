@@ -1,13 +1,28 @@
 -- !preview conn=DBI::dbConnect(RSQLite::SQLite())
 
+
+-- Sample Level Metadata
+CREATE TABLE sample (
+    sampleId TEXT NOT NULL,
+    disease TEXT NOT NULL,
+    description TEXT,
+    PRIMARY KEY (sampleId),
+    unique(sampleId)
+);
+
+CREATE INDEX idx_samplemeta_sample ON sample (sampleId);
+CREATE INDEX idx_samplemeta_disease ON sample (disease);
+
 -- Decompositions
 CREATE TABLE decompositions (
-    sampleId TEXT,
-    class TEXT,
-    channel TEXT,
+    sampleId TEXT NOT NULL,
+    class TEXT NOT NULL,
+    channel TEXT NOT NULL,
     fraction FLOAT,
-    count FLOAT,
+    count FLOAT NOT NULL,
     unique (sampleId, channel, class)
+    PRIMARY KEY (sampleId, channel, class)
+    FOREIGN KEY(sampleId) REFERENCES sample(sampleId)
 );
 
 CREATE INDEX idx_sample_class_channel ON decompositions (sampleId, class, channel);
@@ -18,14 +33,16 @@ CREATE INDEX idx_count_fraction ON decompositions (count, fraction);
 
 -- Cosmic Exposures
 CREATE TABLE cosmicExposures (
-    sampleId TEXT,
-    signature TEXT,
+    sampleId TEXT NOT NULL,
+    signature TEXT NOT NULL,
     contribution FLOAT,
     contributionRelative FLOAT,
     type FLOAT,
-    optimal BOOLEAN,
-    method TEXT CHECK (method IN ('SA', 'QP')),
+    optimal BOOLEAN NOT NULL,
+    method TEXT CHECK (method IN ('SA', 'QP')) NOT NULL,
     unique (sampleId, signature, type, method)
+    PRIMARY KEY (sampleId, type, signature, method)
+    FOREIGN KEY(sampleId) REFERENCES sample(sampleId)
 );
 
 CREATE INDEX idx_sample_signature_optimal ON cosmicExposures (sampleId, signature, optimal);
@@ -35,14 +52,15 @@ CREATE INDEX idx_optimal_contributionRelative_signature ON cosmicExposures (opti
 -- error & cosine
 -- "Method","SampleID","Type","IsOptimal","Errors", "Cosine"
 CREATE TABLE cosmicErrorAndCosine (
-    sampleId TEXT,
-    class TEXT,
-    type FLOAT,
-    optimal BOOLEAN,
-    method TEXT CHECK (method IN ('SA', 'QP')),
+    sampleId TEXT NOT NULL,
+    class TEXT NOT NULL,
+    type FLOAT NOT NULL,
+    optimal BOOLEAN NOT NULL,
+    method TEXT CHECK (method IN ('SA', 'QP')) NOT NULL,
     error FLOAT,
     cosine FLOAT,
     unique (sampleId, type, method, class)
+    FOREIGN KEY(sampleId) REFERENCES sample(sampleId)
 );
 
 CREATE INDEX idx_sample_optimal ON cosmicErrorAndCosine (sampleId, optimal);
@@ -55,13 +73,14 @@ CREATE INDEX idx_optimal_cosine ON cosmicErrorAndCosine (optimal, cosine);
 
 -- p_val
 CREATE TABLE cosmicPvalues (
-    sampleId TEXT,
-    class TEXT,
-    signature TEXT,
-    method TEXT CHECK (method IN ('SA', 'QP')),
-    threshold FLOAT,
+    sampleId TEXT NOT NULL,
+    class TEXT NOT NULL,
+    signature TEXT NOT NULL,
+    method TEXT CHECK (method IN ('SA', 'QP')) NOT NULL,
+    threshold FLOAT NOT NULL,
     p FLOAT,
     unique (sampleId, signature, method, class)
+    FOREIGN KEY(sampleId) REFERENCES sample(sampleId)
 );
 
 
@@ -73,9 +92,9 @@ CREATE INDEX idx_sample_signature_method ON cosmicPvalues (sampleId, signature, 
 
 -- Pairwise Cosine Similarity
 CREATE TABLE pairwiseSimilarity (
-    sample1 TEXT,
-    sample2 TEXT,
-    class TEXT,
+    sample1 TEXT NOT NULL,
+    sample2 TEXT NOT NULL,
+    class TEXT NOT NULL,
     cosine_similarity FLOAT,
     unique (sample1, sample2, class),
     PRIMARY KEY (sample1, sample2, class)
@@ -88,8 +107,9 @@ CREATE INDEX idx_pairwise_sample2and1 ON pairwiseSimilarity (sample2, sample1);
 CREATE INDEX idx_pairwise_cosine_class ON pairwiseSimilarity (cosine_similarity, class);
 
 
+
 -- Add a sample-level view describing total mutation count for each decomposition
-CREATE VIEW sample AS
+CREATE VIEW sample_class_summaries AS
   SELECT
       sampleId,
       class,
