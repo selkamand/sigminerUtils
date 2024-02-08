@@ -14,7 +14,7 @@ sig_analyse_mutations(
   exposure_type = c("absolute", "relative"),
   n_bootstraps = 100,
   temp_dir = tempdir(),
-  cores = future::availableCores(omit = 2)
+  cores = future::availableCores()
 )
 }
 \arguments{

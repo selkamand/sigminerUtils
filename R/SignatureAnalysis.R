@@ -23,7 +23,7 @@
 #'
 #'
 #'
-sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores(omit = 2)){
+sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
 
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
