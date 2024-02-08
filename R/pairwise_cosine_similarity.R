@@ -1,11 +1,6 @@
-sig_update_database_sqlite <- function(path_db){
-
-  # Connect to an sqlite signature database and for any samples lacking pairwise cosine similarity - update it.
-
-}
 
 # Fetch Decompositions from db and compute sample similarity
-util_compute_cosine_similarity <- function(sample1, sample2, class, df_decomps){
+util_compute_cosine_similarity <- function(sample1, sample2, class, df_decomps, assume_sensible_input = TRUE){
   s1_decomp = df_decomps |>
     dplyr::filter(sampleId == sample1, class == !!class) |>
     dplyr::rename(type = class)
@@ -20,7 +15,7 @@ util_compute_cosine_similarity <- function(sample1, sample2, class, df_decomps){
     return(NA_real_)
 
   ## Otherwise Compute Similarity
-  sigstats::sig_cosine_similarity(s1_decomp, s2_decomp)
+  sigstats::sig_cosine_similarity(s1_decomp, s2_decomp, assume_sensible_input = assume_sensible_input)
 }
 
 extract_sigverse_decomps <- function(sample, class, df_decomps, overwrite){
@@ -29,7 +24,18 @@ extract_sigverse_decomps <- function(sample, class, df_decomps, overwrite){
     dplyr::rename(type = class)
 }
 
-sig_pairwise_similarity <- function(path_db, overwrite = FALSE, verbose = TRUE){
+#' Compute Pairwise Similarity Table from Database
+#'
+#' @param path_db path to sqlite database
+#' @param cores number of cores to use
+#' @param overwrite should we only calculate similarity for pairs not already in the pairwiseSimilarity table?
+#' @param assume_sensible_input should we speed up cosine sim by ~30x by assuming input we supply will be appropriate (channels in the same order)
+#' @param verbose verbose
+#'
+#' @return a data.frame with pairwise cosine similarities (sample 1 & sample 2 columns based on R 'sort' order of sampleIds & upper triangle only)
+#' @export
+#'
+sig_pairwise_similarity <- function(path_db, cores = future::availableCores(), overwrite = FALSE, assume_sensible_input = TRUE, verbose = TRUE){
 
   # Connect to SQLite DB
   conn <- DBI::dbConnect(RSQLite::SQLite() ,path_db)
@@ -62,18 +68,27 @@ sig_pairwise_similarity <- function(path_db, overwrite = FALSE, verbose = TRUE){
     df_rows_to_add <- df_rows_to_add |>
       dplyr::filter(!pair_id %in% pairs_already_in_db)
 
-    if (verbose) cli::cli_alert('Found {length(df_rows_to_add)} unique combinations of sampleId{?s} & classes to add to {?s} pairwiseSimilarity table')
+    if (verbose) cli::cli_alert('Found {nrow(df_rows_to_add)} unique combinations of sampleId{?s} & classes to add to {?s} pairwiseSimilarity table')
   }
   else{
-    if (verbose) cli::cli_alert('Found {length(df_rows_to_add)} unique combinations of sampleId{?s} & classes to add to {?s} pairwiseSimilarity table')
+    if (verbose) cli::cli_alert('Found {nrow(df_rows_to_add)} unique combinations of sampleId{?s} & classes to add to {?s} pairwiseSimilarity table')
   }
 
 
+  # Create a list of inputs that we'll iterate over using Map/purrr::pmap
+  l <- df_rows_to_add |>
+    dplyr::select(sample1, sample2, class) |>
+    as.list() |>
+    lapply(as.character)
+
   # Compute Cosine Similarity
-  df_rows_to_add[['cosine_similarity']] <- purrr::pmap_dbl(
-    .l = df_rows_to_add |> dplyr::select(sample1, sample2, class),
-    .f = \(sample1, sample2, class) { util_compute_cosine_similarity(sample1, sample2, class, df_decompositions) }
-  )
+  df_rows_to_add[['cosine_similarity']] <- parallel::mcMap(
+    f = \(sample1, sample2, class) { util_compute_cosine_similarity(sample1, sample2, class, df_decompositions, assume_sensible_input) },
+    l[['sample1']],
+    l[['sample2']],
+    l[['class']],
+    mc.cores = cores
+  ) |> unlist()
 
   # Drop Unused Columns
   df_rows_to_add  <- df_rows_to_add |>
