@@ -16,14 +16,14 @@
 #' @param db_sbs a signature collection data.frame where rows are channels and columns are signatures.
 #' @param db_indel a signature collection data.frame where rows are channels and columns are signatures.
 #' @param db_dbs a signature collection data.frame where rows are channels and columns are signatures.
-#'
+#' @param cores Number of cores to use.
 #' @return None.
 #' @export
 #' @importFrom rlang `%||%`
 #'
 #'
 #'
-sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir()){
+sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores(omit = 2)){
 
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
@@ -85,7 +85,8 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
     object = maf,
     mode = "ALL",
     ref_genome = ref_genome,
-    keep_only_matrix = FALSE
+    keep_only_matrix = FALSE,
+    cores = cores
   )
 
   cli::cli_h2("Fitting")
@@ -114,7 +115,7 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
     method = "QP",
     min_count = 1L,
     p_val_thresholds = c(0.05),
-    use_parallel = TRUE,
+    use_parallel = cores,
     seed = 123456L,
     job_id = NULL,
     result_dir = temp_dir,

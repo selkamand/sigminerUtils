@@ -13,7 +13,8 @@ sig_analyse_mutations(
   output_dir = "./signatures",
   exposure_type = c("absolute", "relative"),
   n_bootstraps = 100,
-  temp_dir = tempdir()
+  temp_dir = tempdir(),
+  cores = future::availableCores(omit = 2)
 )
 }
 \arguments{
@@ -34,6 +35,8 @@ sig_analyse_mutations(
 \item{n_bootstraps}{The number of bootstrap iterations for fitting signatures. Default is 100.}
 
 \item{temp_dir}{The temporary directory for storing intermediate files. Default is tempdir().}
+
+\item{cores}{Number of cores to use.}
 }
 \value{
 None.
