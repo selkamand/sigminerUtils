@@ -69,7 +69,16 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
   cli::cli_alert_info("Reference Genome: {.strong {ref_genome}}")
 
   # Read MAF file if supplied as filepath
-  maf <- sigminer::read_maf_minimal(readr::read_tsv(maf, show_col_types = FALSE))
+  if(is.character(maf))
+   maf <- readr::read_tsv(maf, show_col_types = FALSE)
+
+  # If maf is a data.frame, read it into a maf object
+  if(is.data.frame(maf)){
+    maf <- sigminer::read_maf_minimal(maf)
+  }
+
+  # By this point the maf variable must contain a MAF object
+  assertions::assert_class(maf, class = "MAF", msg = "maf input in an unexpected format. Please supply maf argument as either a path to a MAF file, a data.frame with MAF columns, or a MAF object from maftools. If you're input format is acceptable please check that your file/object conforms to the MAF specification")
 
   cli::cli_h2("Decomposition")
   decompositions <- sigminer::sig_tally(

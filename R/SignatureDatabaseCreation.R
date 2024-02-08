@@ -30,9 +30,8 @@ signature_directory_to_table <- function(signature_directory){
 
 #' Create a Signature Database
 #'
-#' @param sqlite_db  path to sql db
-#' @param overwrite  overwrite old sqlite db
-#'
+#' @param sqlite_db path to sql db
+#' @param overwrite overwrite old sqlite db
 #' @return invisible(NULL) run for its side effects
 #' @export
 sig_create_database <- function(sqlite_db, overwrite = TRUE){
