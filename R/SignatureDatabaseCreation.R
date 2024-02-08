@@ -232,6 +232,7 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
   DBI::dbWriteTable(conn = con, name = "cosmicPvalues", df_pval, append = TRUE, row.names = FALSE)
 
   # After other data is written: compute pairwise-similarity for any new samples vs all old samples
+  cli::cli_progress_step('Computing pairwise-similarity between all samples')
   df_pairwise_sim <- sig_pairwise_similarity(sqlite_db, verbose = FALSE)
   cli::cli_progress_step("Appending pairwise-similarity data to database {.path {sqlite_db}}")
   DBI::dbWriteTable(conn = con, name = "pairwiseSimilarity", df_pairwise_sim, append = TRUE, row.names = FALSE)
