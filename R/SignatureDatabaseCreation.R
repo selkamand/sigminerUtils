@@ -194,16 +194,34 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
     assertions::assert_dataframe(metadata)
     assertions::assert_names_include(metadata, c('sampleId','disease', 'description'))
 
-    # If we're missing sample Ids in our metadata, flag it here
-    assertions::assert_subset(
-      unique_samples_in_decomposition_csv,
-      metadata[['sampleId']],
-      msg = ""
-    )
+    # If we're missing sample Ids in our metadata, flag it here - perhaps we should actually just
+    # 1. filter out samples lacking metadata
+    # 2. or we just add in some empty metadata
 
+    samples_missing_metadata <- setdiff(unique_samples_in_decomposition_csv, metadata[['sampleId']])
+
+    if (length(samples_missing_metadata > 0)){
+      cli::cli_warn(
+        "There are {length(samples_missing_metadata)} samples that are in the mutational signature analysis but are missing from the metadata.
+        We will include these samples in our metadata with disease = 'not_indicated';"
+        )
+
+      cli::cli_alert_info('Samples missing metadata: {samples_missing_metadata}')
+
+       df_samples_missing <- data.frame(
+         sampleId = samples_missing_metadata,
+         disease = rep("not_indicated", times = length(samples_missing_metadata)),
+         description = character(length(samples_missing_metadata))
+         )
+
+       metadata <- metadata |>
+         dplyr::bind_rows(df_samples_missing)
+
+    }
     metadata <- metadata |>
       dplyr::select(sampleId, disease, description)
   }
+
 
   # Drop metadata rows not in decomposition table so that users can
   # supply metadata for a full cohort when mutsig analysis is performed only on a subset -
