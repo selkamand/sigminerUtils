@@ -9,7 +9,8 @@ sig_pairwise_similarity(
   cores = future::availableCores(),
   overwrite = FALSE,
   assume_sensible_input = TRUE,
-  verbose = TRUE
+  verbose = TRUE,
+  low_ram = FALSE
 )
 }
 \arguments{
@@ -22,6 +23,8 @@ sig_pairwise_similarity(
 \item{assume_sensible_input}{should we speed up cosine sim by ~30x by assuming input we supply will be appropriate (channels in the same order)}
 
 \item{verbose}{verbose}
+
+\item{low_ram}{run in a low-ram version where instead of loading all decompositions for all samples into memory, we repeatedly query the sqlite db to fetch each sample}
 }
 \value{
 a data.frame with pairwise cosine similarities (sample 1 & sample 2 columns based on R 'sort' order of sampleIds & upper triangle only)

@@ -40,8 +40,8 @@ sig_create_database <- function(sqlite_db, overwrite = TRUE){
   cli::cli_h2('Create Signature Database')
 
   cli::cli_progress_step("Checking if db exists")
-  if(file.exists(sqlite_db)){
-    if (!overwrite){
+  if (file.exists(sqlite_db)) {
+    if (!overwrite) {
       cli::cli_abort('Signature database already exists. Delete {.path {sqlite_db}} or set {.code overwrite = TRUE} to replace existing database')
     }
     else{
@@ -64,7 +64,7 @@ sig_create_database <- function(sqlite_db, overwrite = TRUE){
   database_creation_script <- split_sql_string_by_command(database_creation_script)
 
   cli::cli_progress_step("Running Database Creation Script")
-  for (command in database_creation_script){
+  for (command in database_creation_script) {
     DBI::dbExecute(conn = con, statement = command)
   }
 }
@@ -237,11 +237,12 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
   cli::cli_progress_step("Appending sample metadata table {.path {sqlite_db}}")
   DBI::dbWriteTable(conn = con, name = "sample", metadata, append = TRUE, row.names = FALSE)
 
-  cli::cli_progress_step("Appending exposure data to database {.path {sqlite_db}}")
-  DBI::dbWriteTable(conn = con, name = "cosmicExposures", df_exposures, append = TRUE, row.names = FALSE)
-
   cli::cli_progress_step("Appending decomposition data to database {.path {sqlite_db}}")
   DBI::dbWriteTable(conn = con, name = "decompositions", df_decomposition, append = TRUE, row.names = FALSE)
+
+
+  cli::cli_progress_step("Appending exposure data to database {.path {sqlite_db}}")
+  DBI::dbWriteTable(conn = con, name = "cosmicExposures", df_exposures, append = TRUE, row.names = FALSE)
 
   cli::cli_progress_step("Appending error and cosine data to database {.path {sqlite_db}}")
   DBI::dbWriteTable(conn = con, name = "cosmicErrorAndCosine", df_error_and_cosine, append = TRUE, row.names = FALSE)
@@ -252,6 +253,7 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
   # After other data is written: compute pairwise-similarity for any new samples vs all old samples
   cli::cli_progress_step('Computing pairwise-similarity between all samples')
   df_pairwise_sim <- sig_pairwise_similarity(sqlite_db, verbose = FALSE)
+
   cli::cli_progress_step("Appending pairwise-similarity data to database {.path {sqlite_db}}")
   DBI::dbWriteTable(conn = con, name = "pairwiseSimilarity", df_pairwise_sim, append = TRUE, row.names = FALSE)
 
