@@ -78,9 +78,10 @@ sig_create_database <- function(sqlite_db, overwrite = TRUE){
 #' @param sqlite_db path to the sqlite database produced by [sig_create_database()]
 #' @param ref reference genome: one of hg19 or hg38 (string)
 #' @param metadata a sample-level data.frame with columns sampleId, disease and description. If not supplied will be automatically generated.
+#' @param skip_similarity should we compute sample similarity (boolean)
 #' @return invisible(NULL). This function is run for its side effects
 #' @export
-sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", "hg38"), metadata = NULL){
+sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", "hg38"), metadata = NULL, skip_similarity = FALSE){
   assertions::assert_directory_exists(signature_directory)
   assertions::assert_file_exists(sqlite_db)
   ref <- rlang::arg_match(ref)
@@ -250,12 +251,13 @@ sig_add_to_database <- function(signature_directory, sqlite_db, ref = c("hg19", 
   cli::cli_progress_step("Appending P-value data to database {.path {sqlite_db}}")
   DBI::dbWriteTable(conn = con, name = "cosmicPvalues", df_pval, append = TRUE, row.names = FALSE)
 
-  # After other data is written: compute pairwise-similarity for any new samples vs all old samples
-  cli::cli_progress_step('Computing pairwise-similarity between all samples')
-  df_pairwise_sim <- sig_pairwise_similarity(sqlite_db, verbose = FALSE)
+  if(!skip_similarity) {
+    # After other data is written: compute pairwise-similarity for any new samples vs all old samples
+    cli::cli_progress_step('Computing pairwise-similarity between all samples')
+    df_pairwise_sim <- sig_pairwise_similarity(sqlite_db, verbose = FALSE)
 
-  cli::cli_progress_step("Appending pairwise-similarity data to database {.path {sqlite_db}}")
-  DBI::dbWriteTable(conn = con, name = "pairwiseSimilarity", df_pairwise_sim, append = TRUE, row.names = FALSE)
-
+    cli::cli_progress_step("Appending pairwise-similarity data to database {.path {sqlite_db}}")
+    DBI::dbWriteTable(conn = con, name = "pairwiseSimilarity", df_pairwise_sim, append = TRUE, row.names = FALSE)
+  }
   return(invisible(NULL))
 }

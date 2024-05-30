@@ -8,7 +8,8 @@ sig_add_to_database(
   signature_directory,
   sqlite_db,
   ref = c("hg19", "hg38"),
-  metadata = NULL
+  metadata = NULL,
+  skip_similarity = FALSE
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ sig_add_to_database(
 \item{ref}{reference genome: one of hg19 or hg38 (string)}
 
 \item{metadata}{a sample-level data.frame with columns sampleId, disease and description. If not supplied will be automatically generated.}
+
+\item{skip_similarity}{should we compute sample similarity (boolean)}
 }
 \value{
 invisible(NULL). This function is run for its side effects
