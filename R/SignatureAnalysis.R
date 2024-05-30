@@ -8,14 +8,13 @@
 #' Run all signature mutation analyses possible from MAF inputs on
 #'
 #' @param maf The input MAF file. Can be a maf object or the path to a MAF file
+#' @param copynumber The input copynumber data.frame. See [sigminer::read_copynumber()] for details.
 #' @param ref A character vector specifying the reference genome. One of 'hg38' or 'hg19'.
 #' @param output_dir The output directory for storing results. Default is "./signatures".
 #' @param exposure_type The type of exposure. Can be "absolute" or "relative". One of "absolute" or "relative"
 #' @param n_bootstraps The number of bootstrap iterations for fitting signatures. Default is 100.
 #' @param temp_dir The temporary directory for storing intermediate files. Default is tempdir().
-#' @param db_sbs a signature collection data.frame where rows are channels and columns are signatures.
-#' @param db_indel a signature collection data.frame where rows are channels and columns are signatures.
-#' @param db_dbs a signature collection data.frame where rows are channels and columns are signatures.
+#' @param db_sbs,db_indel,db_dbs,db_cn a signature collection data.frame where rows are channels and columns are signatures.
 #' @param cores Number of cores to use.
 #' @return None.
 #' @export
@@ -23,14 +22,14 @@
 #'
 #'
 #'
-sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
+sig_analyse_mutations <- function(maf, copynumber = NULL, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
 
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
-
-
   ref <- rlang::arg_match(ref)
   exposure_type <- rlang::arg_match(exposure_type)
+  if(!is.null(copynumber)) { assertions::assert_dataframe(copynumber); cn=TRUE}
+  else cn = FALSE
 
 
   # Define default signature collections based on reference genome
@@ -38,19 +37,22 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
     default_sbs =  sigstash::sig_load("COSMIC_v3.3.1_SBS_GRCh38", format = "sigminer")
     default_indel = sigstash::sig_load("COSMIC_v3.3_ID_GRCh37", format = "sigminer") # no hg38 renormalised data is available in cosmic
     default_dbs = sigstash::sig_load("COSMIC_v3.3_DBS_GRCh37", format = "sigminer") #no hg38 renormalised data is available in cosmic
+    default_cn = sigstash::sig_load("COSMIC_v3.3_CN_GRCh37", format = "sigminer") #no hg38 renormalised data is available in cosmic
   }
   else if (ref == "hg19"){
     default_sbs = sigstash::sig_load("COSMIC_v3.3.1_SBS_GRCh37", format = "sigminer")
     default_indel = sigstash::sig_load("COSMIC_v3.3_ID_GRCh37", format = "sigminer")
     default_dbs = sigstash::sig_load("COSMIC_v3.3_DBS_GRCh37", format = "sigminer")
+    default_cn = sigstash::sig_load("COSMIC_v3.3_CN_GRCh37", format = "sigminer")
   }
   else
     stop('Unexpected value of ref: ', ref)
 
-  # Set signaure collection to defaults if null.
+  # Set signature collection to defaults if null.
   db_sbs <- db_sbs %||% default_sbs
   db_indel <- db_indel %||% default_indel
   db_dbs <- db_dbs %||% default_dbs
+  db_cn <- db_cn %||% default_cn
 
   # Pick appropriate reference gene
   if(ref == "hg19"){
@@ -60,7 +62,7 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
   }else
     stop("Unknown reference genome", ref)
 
-
+  # Create Output directory
   if(!file.exists(output_dir)){
     cli::cli_alert_info("Creating Output Directory at: {.path {output_dir}}")
     dir.create(output_dir)
@@ -80,7 +82,7 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
   # By this point the maf variable must contain a MAF object
   assertions::assert_class(maf, class = "MAF", msg = "maf input in an unexpected format. Please supply maf argument as either a path to a MAF file, a data.frame with MAF columns, or a MAF object from maftools. If you're input format is acceptable please check that your file/object conforms to the MAF specification")
 
-  cli::cli_h2("Decomposition")
+  cli::cli_h2("Decomposition (Small Variants)")
   decompositions <- sigminer::sig_tally(
     object = maf,
     mode = "ALL",
@@ -89,20 +91,42 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
     cores = cores
   )
 
+  if(cn){
+  cli::cli_h2("Decomposition (CopyNumber)")
+
+   cn_object <- sigminer::read_copynumber(
+     input = copynumber,
+     loh_min_len = 10000,
+     loh_min_frac = 0.05,
+     join_adj_seg = FALSE, # Must be set this way for steele tally method
+     genome_measure = "wg",
+     genome_build = ref,
+     samp_col = "sample",
+     complement = TRUE,
+     add_loh = TRUE
+     )
+
+   tally_copynumber <- sigminer::sig_tally(cn_object, method = "S", ref_genome=ref_genome)
+  }
+
   cli::cli_h2("Fitting")
   sbs_96_matrices <- t(decompositions$SBS_96)
   id_83_matrices <- t(decompositions$ID_83)
   dbs_78_matrices <- t(decompositions$DBS_78)
+  if(cn) cn_48_matrices <- t(tally_copynumber$all_matrices$CN_48)
+
+
 
   # Sort Signature databases so that rows match out sample catalogues
   db_sbs <- sort_so_rownames_match(db_sbs, rowname_desired_order = rownames(sbs_96_matrices))
   db_indel <- sort_so_rownames_match(db_indel, rowname_desired_order = rownames(id_83_matrices))
   db_dbs <- sort_so_rownames_match(db_dbs, rowname_desired_order = rownames(dbs_78_matrices))
+  if(cn) db_cn <- sort_so_rownames_match(db_cn, rowname_desired_order = rownames(cn_48_matrices))
 
   assertions::assert_identical(rownames(sbs_96_matrices), rownames(db_sbs))
   assertions::assert_identical(rownames(id_83_matrices), rownames(db_indel))
   assertions::assert_identical(rownames(dbs_78_matrices), rownames(db_dbs))
-
+  if(cn) assertions::assert_identical(rownames(cn_48_matrices), rownames(db_cn))
 
   cli::cli_h3("Single Base Substitutions (SBS96)")
   # Single Base Substitution
@@ -160,14 +184,33 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
     type = exposure_type # could be 'relative' or 'absolute'
   )
 
+  if(cn){
+    cli::cli_h3("Copy Number Alterations (CN48)")
+    cn48_fit <- sigminer::sig_fit_bootstrap_batch(
+      catalog = cn_48_matrices,
+      sig = db_cn,
+      #sig_db = "DBS",  # Use 'legacy' for V2
+      #sig_index= "ALL",
+      n = n_bootstraps,
+      method = "QP",
+      min_count = 1L,
+      p_val_thresholds = c(0.05),
+      use_parallel = TRUE,
+      seed = 123456L,
+      job_id = NULL,
+      result_dir = temp_dir,
+      #mode = "copynumber",
+      type = exposure_type # could be 'relative' or 'absolute'
+    )
 
+  }
 
   cli::cli_h2("Write Output")
   cli::cli_h3("Raw counts (decompositions)")
   outfile_sbs96_decompositions <- glue::glue("{output_dir}/SBS96_catalogue.{ref}.decomposition.csv")
   outfile_id83_decompositions <- glue::glue("{output_dir}/ID83_catalogue.{ref}.decomposition.csv")
   outfile_dbs78_decompositions <- glue::glue("{output_dir}/DBS78_catalogue.{ref}.decomposition.csv")
-
+  outfile_cn48_decompositions <- glue::glue("{output_dir}/CN48_catalogue.{ref}.decomposition.csv")
 
   # Longify Decomposition Matrices (result of prepare_matrix)
   fix_decomposition <- function(matrix){
@@ -192,6 +235,11 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
     utils::write.csv(file = outfile_dbs78_decompositions, row.names = FALSE)
   cli::cli_alert_success("DBS_78 decomposition written to csv: {.path {outfile_dbs78_decompositions}}")
 
+  if(cn){
+    fix_decomposition(cn_48_matrices) |>
+      utils::write.csv(file = outfile_cn48_decompositions, row.names = FALSE)
+    cli::cli_alert_success("CN_48 decomposition written to csv: {.path {outfile_cn48_decompositions}}")
+  }
 
   cli::cli_h3("Fit (Exposures)")
 
@@ -247,6 +295,7 @@ sig_analyse_mutations <- function(maf, db_sbs = NULL, db_indel = NULL, db_dbs = 
   write_model_outputs(fit = sbs96_fit, fit_type = "SBS96", output_dir = output_dir, ref = ref)
   write_model_outputs(fit = dbs78_fit, fit_type = "DBS78", output_dir = output_dir, ref = ref)
   write_model_outputs(fit = id83_fit, fit_type = "ID83", output_dir = output_dir, ref = ref)
+  if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref)
 }
 
 

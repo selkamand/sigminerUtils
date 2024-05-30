@@ -47,9 +47,14 @@ sig_create_database('./my_sig_database.sqlite', overwrite = TRUE)
 2. Run Signature Analysis
 
 ```{r, eval = FALSE}
-path_maf <- system.file(package = "sigminerUtils", path = "test.maf")
+path_maf <-  system.file(package = "sigminerUtils", path = "test.maf") 
+path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
 
-sig_analyse_mutations(maf = path_maf, ref = "hg19")
+sig_analyse_mutations(
+  maf = path_maf, 
+  read.csv(path_copynumber),
+  ref = "hg19"
+  )
 ```
 
 ``

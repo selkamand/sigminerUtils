@@ -6,9 +6,11 @@
 \usage{
 sig_analyse_mutations(
   maf,
+  copynumber = NULL,
   db_sbs = NULL,
   db_indel = NULL,
   db_dbs = NULL,
+  db_cn = NULL,
   ref = c("hg38", "hg19"),
   output_dir = "./signatures",
   exposure_type = c("absolute", "relative"),
@@ -20,11 +22,9 @@ sig_analyse_mutations(
 \arguments{
 \item{maf}{The input MAF file. Can be a maf object or the path to a MAF file}
 
-\item{db_sbs}{a signature collection data.frame where rows are channels and columns are signatures.}
+\item{copynumber}{The input copynumber data.frame. See \code{\link[sigminer:read_copynumber]{sigminer::read_copynumber()}} for details.}
 
-\item{db_indel}{a signature collection data.frame where rows are channels and columns are signatures.}
-
-\item{db_dbs}{a signature collection data.frame where rows are channels and columns are signatures.}
+\item{db_sbs, db_indel, db_dbs, db_cn}{a signature collection data.frame where rows are channels and columns are signatures.}
 
 \item{ref}{A character vector specifying the reference genome. One of 'hg38' or 'hg19'.}
 
