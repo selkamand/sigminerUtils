@@ -21,6 +21,7 @@ Imports:
     future,
     glue,
     lsa,
+    R.utils,
     readr,
     rlang,
     RSQLite,

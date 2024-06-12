@@ -1,6 +1,3 @@
-# Utilities --------------------------------------------------------
-
-
 # Mutational Signature Analysis -------------------------------------------
 
 #' Mutational Signature Analysis
@@ -22,28 +19,30 @@
 #'
 #'
 #'
-sig_analyse_mutations <- function(maf, copynumber = NULL, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
+sig_analyse_mutations <- function(maf, copynumber = NULL, structuralvariant = NULL, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
 
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
   ref <- rlang::arg_match(ref)
   exposure_type <- rlang::arg_match(exposure_type)
-  if(!is.null(copynumber)) { assertions::assert_dataframe(copynumber); cn=TRUE}
-  else cn = FALSE
+  if(!is.null(copynumber)) { assertions::assert_dataframe(copynumber); cn=TRUE} else cn = FALSE
+  if(!is.null(structuralvariant)) { assertions::assert_dataframe(structuralvariant); sv = TRUE} else sv = FALSE
 
 
   # Define default signature collections based on reference genome
   if(ref == "hg38"){
-    default_sbs =  sigstash::sig_load("COSMIC_v3.3.1_SBS_GRCh38", format = "sigminer")
-    default_indel = sigstash::sig_load("COSMIC_v3.3_ID_GRCh37", format = "sigminer") # no hg38 renormalised data is available in cosmic
-    default_dbs = sigstash::sig_load("COSMIC_v3.3_DBS_GRCh37", format = "sigminer") #no hg38 renormalised data is available in cosmic
-    default_cn = sigstash::sig_load("COSMIC_v3.3_CN_GRCh37", format = "sigminer") #no hg38 renormalised data is available in cosmic
+    default_sbs =  sigstash::sig_load("COSMIC_v3.4_SBS_GRCh38", format = "sigminer")
+    default_dbs = sigstash::sig_load("COSMIC_v3.4_DBS_GRCh38", format = "sigminer")
+    default_indel = sigstash::sig_load("COSMIC_v3.4_ID_GRCh37", format = "sigminer") # no hg38 renormalised data is available in cosmic
+    default_cn = sigstash::sig_load("COSMIC_v3.4_CN_GRCh37", format = "sigminer") #no hg38 renormalised data is available in cosmic
+    default_sv = sigstash::sig_load("COSMIC_v3.4_SV_GRCh38", format = "sigminer")
   }
   else if (ref == "hg19"){
-    default_sbs = sigstash::sig_load("COSMIC_v3.3.1_SBS_GRCh37", format = "sigminer")
-    default_indel = sigstash::sig_load("COSMIC_v3.3_ID_GRCh37", format = "sigminer")
-    default_dbs = sigstash::sig_load("COSMIC_v3.3_DBS_GRCh37", format = "sigminer")
-    default_cn = sigstash::sig_load("COSMIC_v3.3_CN_GRCh37", format = "sigminer")
+    default_sbs = sigstash::sig_load("COSMIC_v3.4_SBS_GRCh37", format = "sigminer")
+    default_dbs = sigstash::sig_load("COSMIC_v3.4_DBS_GRCh37", format = "sigminer")
+    default_indel = sigstash::sig_load("COSMIC_v3.4_ID_GRCh37", format = "sigminer")
+    default_cn = sigstash::sig_load("COSMIC_v3.4_CN_GRCh37", format = "sigminer")
+    default_sv = sigstash::sig_load("COSMIC_v3.4_SV_GRCh38", format = "sigminer") #no hg37 renormalised data is available in cosmic
   }
   else
     stop('Unexpected value of ref: ', ref)
@@ -53,6 +52,7 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, db_sbs = NULL, db_inde
   db_indel <- db_indel %||% default_indel
   db_dbs <- db_dbs %||% default_dbs
   db_cn <- db_cn %||% default_cn
+  db_sv <- db_sv %||% default_sv
 
   # Pick appropriate reference gene
   if(ref == "hg19"){
@@ -82,8 +82,8 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, db_sbs = NULL, db_inde
   # By this point the maf variable must contain a MAF object
   assertions::assert_class(maf, class = "MAF", msg = "maf input in an unexpected format. Please supply maf argument as either a path to a MAF file, a data.frame with MAF columns, or a MAF object from maftools. If you're input format is acceptable please check that your file/object conforms to the MAF specification")
 
-  cli::cli_h2("Decomposition (Small Variants)")
-  decompositions <- sigminer::sig_tally(
+  cli::cli_h2("Tally (Small Variants)")
+  tally <- sigminer::sig_tally(
     object = maf,
     mode = "ALL",
     ref_genome = ref_genome,
@@ -92,7 +92,7 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, db_sbs = NULL, db_inde
   )
 
   if(cn){
-  cli::cli_h2("Decomposition (CopyNumber)")
+    cli::cli_h2("Tally (CopyNumber)")
 
    cn_object <- sigminer::read_copynumber(
      input = copynumber,
@@ -106,27 +106,53 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, db_sbs = NULL, db_inde
      add_loh = TRUE
      )
 
-   tally_copynumber <- sigminer::sig_tally(cn_object, method = "S", ref_genome=ref_genome)
+   tally_copynumber_steele <- sigminer::sig_tally(cn_object, method = "S", ref_genome=ref_genome, cores = cores)
+   tally_copynumber_wang <- sigminer::sig_tally(cn_object, method = "W", ref_genome=ref_genome, cores = cores)
+   tally_copynumber_tao <- sigminer::sig_tally(cn_object, method = "X", ref_genome=ref_genome, cores = cores)
+  }
+
+  if(sv){
+    cli::cli_h2("Tally (SV)")
+    sv_object <- sigminer::read_sv_as_rs(structuralvariant)
+    tally_sv <- sigminer::sig_tally(sv_object, ref_genome=ref_genome, cores = cores)
   }
 
   cli::cli_h2("Fitting")
-  sbs_96_matrices <- t(decompositions$SBS_96)
-  id_83_matrices <- t(decompositions$ID_83)
-  dbs_78_matrices <- t(decompositions$DBS_78)
-  if(cn) cn_48_matrices <- t(tally_copynumber$all_matrices$CN_48)
+  sbs_96_matrices <- t(tally$SBS_96)
+  id_83_matrices <- t(tally$ID_83)
+  dbs_78_matrices <- t(tally$DBS_78)
 
+  # Matrices without sig databases
+  sbs_1536_matrices <- t(tally$SBS_1536)
 
+  if(cn) {
+    cn_48_matrices <- t(tally_copynumber_steele$all_matrices$CN_48)
+
+    # Matrices without sig databases (might need to replace with simpler versions
+    cn_80_wang_matrices <- t(tally_copynumber_wang$nmf_matrix)
+    cn_176_tao_matrices <- t(tally_copynumber_tao$all_matrices$standard_matrix)
+  }
+
+  if(sv){
+    sv_32_matrices <- t(tally_sv$all_matrices$RS_32)
+
+    # Matrix without a sig database
+    sv_38_matrices <- t(tally_sv$all_matrices$RS_38)
+  }
 
   # Sort Signature databases so that rows match out sample catalogues
   db_sbs <- sort_so_rownames_match(db_sbs, rowname_desired_order = rownames(sbs_96_matrices))
   db_indel <- sort_so_rownames_match(db_indel, rowname_desired_order = rownames(id_83_matrices))
   db_dbs <- sort_so_rownames_match(db_dbs, rowname_desired_order = rownames(dbs_78_matrices))
   if(cn) db_cn <- sort_so_rownames_match(db_cn, rowname_desired_order = rownames(cn_48_matrices))
+  if(sv) db_sv <- sort_so_rownames_match(db_sv, rowname_desired_order = rownames(sv_32_matrices))
 
   assertions::assert_identical(rownames(sbs_96_matrices), rownames(db_sbs))
   assertions::assert_identical(rownames(id_83_matrices), rownames(db_indel))
   assertions::assert_identical(rownames(dbs_78_matrices), rownames(db_dbs))
   if(cn) assertions::assert_identical(rownames(cn_48_matrices), rownames(db_cn))
+  if(sv) assertions::assert_identical(rownames(sv_32_matrices), rownames(db_sv))
+
 
   cli::cli_h3("Single Base Substitutions (SBS96)")
   # Single Base Substitution
@@ -202,18 +228,33 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, db_sbs = NULL, db_inde
       #mode = "copynumber",
       type = exposure_type # could be 'relative' or 'absolute'
     )
+  }
 
+  if(sv){
+    browser()
+    cli::cli_h3("Structural Variants (SV32)")
+    sv32_fit <- sigminer::sig_fit_bootstrap_batch(
+      catalog = sv_32_matrices,
+      sig = db_sv,
+      #sig_db = "DBS",  # Use 'legacy' for V2
+      #sig_index= "ALL",
+      n = n_bootstraps,
+      method = "QP",
+      min_count = 1L,
+      p_val_thresholds = c(0.05),
+      use_parallel = TRUE,
+      seed = 123456L,
+      job_id = NULL,
+      result_dir = temp_dir,
+      type = exposure_type # could be 'relative' or 'absolute'
+    )
   }
 
   cli::cli_h2("Write Output")
-  cli::cli_h3("Raw counts (decompositions)")
-  outfile_sbs96_decompositions <- glue::glue("{output_dir}/SBS96_catalogue.{ref}.decomposition.csv")
-  outfile_id83_decompositions <- glue::glue("{output_dir}/ID83_catalogue.{ref}.decomposition.csv")
-  outfile_dbs78_decompositions <- glue::glue("{output_dir}/DBS78_catalogue.{ref}.decomposition.csv")
-  outfile_cn48_decompositions <- glue::glue("{output_dir}/CN48_catalogue.{ref}.decomposition.csv")
+  cli::cli_h3("Raw counts (tally)")
 
-  # Longify Decomposition Matrices (result of prepare_matrix)
-  fix_decomposition <- function(matrix){
+  # Longify tally Matrices (result of prepare_matrix)
+  fix_tally <- function(matrix){
     matrix |>
       as.data.frame() |>
       tibble::rownames_to_column(var="Context") |>
@@ -222,48 +263,97 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, db_sbs = NULL, db_inde
       dplyr::relocate(SampleID)
   }
 
-  # Add class column
-  fix_decomposition(sbs_96_matrices) |>
-    utils::write.csv(file = outfile_sbs96_decompositions, row.names = FALSE)
-  cli::cli_alert_success("SBS96 decomposition written to csv: {.path {outfile_sbs96_decompositions}}")
+  write_tally_matrix <- function(matrix, class, output_dir, ref){
 
-  fix_decomposition(id_83_matrices) |>
-    utils::write.csv(file = outfile_id83_decompositions, row.names = FALSE)
-  cli::cli_alert_success("ID83 decomposition written to csv: {.path {outfile_id83_decompositions}}")
+    samples = colnames(tally_ls[[1]])
 
-  fix_decomposition(dbs_78_matrices) |>
-    utils::write.csv(file = outfile_dbs78_decompositions, row.names = FALSE)
-  cli::cli_alert_success("DBS_78 decomposition written to csv: {.path {outfile_dbs78_decompositions}}")
+    df_longform_tally <- fix_tally(matrix)
+    ls_longform <- split(df_longform_tally, f = df_longform_tally[["SampleID"]])
+    for (sample in names(ls_longform)){
+      tmp_tally_outfile = glue::glue("{output_dir}/{class}_catalogue.{sample}.{ref}.tally.csv")
+      write_compressed_csv(
+        x = dplyr::select(ls_longform[[sample]], -SampleID),
+        file = tmp_tally_outfile
+      )
+      cli::cli_alert_success("SBS96 tally written to csv: {.path {tmp_tally_outfile}.gz}")
+    }
+  }
 
-  if(cn){
-    fix_decomposition(cn_48_matrices) |>
-      utils::write.csv(file = outfile_cn48_decompositions, row.names = FALSE)
-    cli::cli_alert_success("CN_48 decomposition written to csv: {.path {outfile_cn48_decompositions}}")
+
+  # Create Tally List
+  tally_ls <- list(
+    "SBS96" = sbs_96_matrices,
+    "SBS1536" = sbs_1536_matrices,
+    "ID83" = id_83_matrices,
+    "DBS78" = dbs_78_matrices
+  )
+  if(cn) {
+    tally_ls[["CN48"]] <- cn_48_matrices
+    tally_ls[["CN80"]] <- cn_80_wang_matrices
+    tally_ls[["CN176"]] <- cn_176_tao_matrices
+  }
+  if(sv){
+   tally_ls[["SV32"]] <- sv_32_matrices
+   tally_ls[["SV38"]] <- sv_38_matrices
+  }
+
+  # Write each matrix
+  for (class in names(tally_ls)){
+    write_tally_matrix(matrix = tally_ls[[class]], class = class, output_dir=output_dir,ref=ref)
   }
 
   cli::cli_h3("Fit (Exposures)")
 
-  # Functions
+  # Functions to pluck different types
   bootstrap_pluck_expo <- function(fit){
     fit$expo |>
       dplyr::rename(SampleID = sample, Contribution = exposure, Sig=sig, Method = method, Type = type)  |>
+      dplyr::filter(Type == "optimal") |>
       dplyr::mutate(ContributionRelative = Contribution / sum(Contribution, na.rm = TRUE), .by = c(SampleID, Type)) |>
-      dplyr::mutate(IsOptimal = Type == "optimal") |>
+      #dplyr::mutate(IsOptimal = Type == "optimal") |>
       dplyr::relocate(.after = dplyr::everything(), c(Contribution, ContributionRelative))
   }
 
-  bootstrap_pluck_error <- function(fit){
-    fit$error |>
-      dplyr::rename(Errors = errors, SampleID = sample, Type = type, Method = method) |>
-      dplyr::mutate(IsOptimal = Type == "optimal") |>
-      dplyr::relocate(Method, SampleID, Type, IsOptimal)
+  bootstrap_pluck_expo_bootstraps <- function(fit){
+    fit$expo |>
+      dplyr::rename(SampleID = sample, Contribution = exposure, Sig=sig, Method = method, Type = type)  |>
+      dplyr::filter(Type != "optimal") |>
+      dplyr::mutate(ContributionRelative = Contribution / sum(Contribution, na.rm = TRUE), .by = c(SampleID, Type)) |>
+      #dplyr::mutate(IsOptimal = Type == "optimal") |>
+      dplyr::relocate(.after = dplyr::everything(), c(Contribution, ContributionRelative))
+
   }
 
-  bootstrap_pluck_cosine<- function(fit){
-    fit$cosine |>
+  bootstrap_pluck_error_and_cosine <- function(fit){
+    df_error <- fit$error |>
+      dplyr::rename(Errors = errors, SampleID = sample, Type = type, Method = method) |>
+      dplyr::filter(Type == "optimal") |>
+      #dplyr::mutate(IsOptimal = Type == "optimal") |>
+      dplyr::relocate(Method, SampleID, Type)
+
+    df_cosine <- fit$cosine |>
       dplyr::rename(Cosine = cosine, SampleID = sample, Type = type, Method = method) |>
-      dplyr::mutate(IsOptimal = Type == "optimal") |>
-      dplyr::relocate(Method, SampleID, Type, IsOptimal)
+      dplyr::filter(Type == "optimal") |>
+      dplyr::relocate(Method, SampleID, Type)
+
+    df_error_and_cosine <- dplyr::left_join(x = df_error, y = df_cosine, by = c("SampleID", "Method", "Type"))
+    return(df_error_and_cosine)
+  }
+
+  bootstrap_pluck_error_and_cosine_bootstraps <- function(fit){
+    df_error <- fit$error |>
+      dplyr::rename(Errors = errors, SampleID = sample, Type = type, Method = method) |>
+      dplyr::filter(Type != "optimal") |>
+      #dplyr::mutate(IsOptimal = Type == "optimal") |>
+      dplyr::relocate(Method, SampleID, Type)
+
+    df_cosine <- fit$cosine |>
+      dplyr::rename(Cosine = cosine, SampleID = sample, Type = type, Method = method) |>
+      dplyr::filter(Type != "optimal") |>
+      dplyr::relocate(Method, SampleID, Type)
+
+    df_error_and_cosine <- dplyr::left_join(x = df_error, y = df_cosine, by = c("SampleID", "Method", "Type"))
+    return(df_error_and_cosine)
   }
 
   bootstrap_pluck_pval <- function(fit){
@@ -275,20 +365,30 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, db_sbs = NULL, db_inde
 
   write_model_outputs <- function(output_dir, fit, fit_type = "SBS96", ref){
 
-    for (fit_metric in c("expo", "error", "cosine", "p_val")){
-      tmp_outfile=glue::glue("{output_dir}/{fit_type}_fit.{ref}.{fit_metric}.csv")
+    for (fit_metric in c(
+      "expo", "expo_bootstraps", "error_and_cosine", "error_and_cosine_bootstraps",  "p_val")
+      ){
 
       if(fit_metric == "expo")
         res <- bootstrap_pluck_expo(fit)
-      else if(fit_metric == "error")
-        res <- bootstrap_pluck_error(fit)
-      else if(fit_metric == "cosine")
-        res <- bootstrap_pluck_cosine(fit)
+      else if(fit_metric == "expo_bootstraps")
+        res <- bootstrap_pluck_expo_bootstraps(fit)
+      else if(fit_metric == "error_and_cosine")
+        res <- bootstrap_pluck_error_and_cosine(fit)
+      else if(fit_metric == "error_and_cosine_bootstraps")
+        res <- bootstrap_pluck_error_and_cosine_bootstraps(fit)
       else if(fit_metric == "p_val")
         res <- bootstrap_pluck_pval(fit)
 
-      utils::write.csv(res, tmp_outfile, row.names = FALSE)
-      cli::cli_alert_success("{fit_type} model fit [{fit_metric}] has been written to csv: {.path {tmp_outfile}}")
+      ls_res <- split(res, f = res[["SampleID"]])
+      for (sample in names(ls_res)) {
+        tmp_outfile=glue::glue("{output_dir}/{fit_type}_fit.{sample}.{ref}.{fit_metric}.csv")
+        write_compressed_csv(
+          x=dplyr::select(.data = ls_res[[sample]], -SampleID),
+          tmp_outfile
+          )
+        cli::cli_alert_success("{fit_type} model fit [{fit_metric}] has been written to csv: {.path {tmp_outfile}.gz}")
+      }
     }
   }
 
@@ -296,6 +396,8 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, db_sbs = NULL, db_inde
   write_model_outputs(fit = dbs78_fit, fit_type = "DBS78", output_dir = output_dir, ref = ref)
   write_model_outputs(fit = id83_fit, fit_type = "ID83", output_dir = output_dir, ref = ref)
   if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref)
+  if(sv) write_model_outputs(fit = cn48_fit, fit_type = "SV32", output_dir = output_dir, ref = ref)
+
 }
 
 

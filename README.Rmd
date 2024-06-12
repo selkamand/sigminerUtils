@@ -49,10 +49,12 @@ sig_create_database('./my_sig_database.sqlite', overwrite = TRUE)
 ```{r, eval = FALSE}
 path_maf <-  system.file(package = "sigminerUtils", path = "test.maf") 
 path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
+path_sv <- system.file(package = "sigminerUtils", path = "test.sv.csv") 
 
 sig_analyse_mutations(
   maf = path_maf, 
-  read.csv(path_copynumber),
+  copynumber = read.csv(path_copynumber),
+  structuralvariant = read.csv(path_sv),
   ref = "hg19"
   )
 ```
