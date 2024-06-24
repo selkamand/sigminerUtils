@@ -231,7 +231,7 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, structuralvariant = NU
   }
 
   if(sv){
-    browser()
+    #browser()
     cli::cli_h3("Structural Variants (SV32)")
     sv32_fit <- sigminer::sig_fit_bootstrap_batch(
       catalog = sv_32_matrices,
@@ -362,17 +362,31 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, structuralvariant = NU
       dplyr::relocate(Method, SampleID)
   }
 
+  bootstrap_pluck_summary <- function(fit){
+    # Summarise the bootstraps by signature with all the information required to filter sigs.
+    df_bootstraps <- bootstrap_pluck_expo_bootstraps(fit)
+    df_summary <- df_bootstraps |>
+      dplyr::summarise(
+        boxplotstats::calculate_boxplot_stats(ContributionRelative, outliers_as_strings = TRUE),
+        experimental_pval = sigstats::sig_compute_experimental_p_value(ContributionRelative, threshold = 0.05),
+        .by = Sig
+        )
+    return(df_summary)
+  }
+
 
   write_model_outputs <- function(output_dir, fit, fit_type = "SBS96", ref){
 
     for (fit_metric in c(
-      "expo", "expo_bootstraps", "error_and_cosine", "error_and_cosine_bootstraps",  "p_val")
+      "expo", "expo_bootstraps", "bootstrap_summary" , "error_and_cosine", "error_and_cosine_bootstraps",  "p_val")
       ){
 
       if(fit_metric == "expo")
         res <- bootstrap_pluck_expo(fit)
       else if(fit_metric == "expo_bootstraps")
         res <- bootstrap_pluck_expo_bootstraps(fit)
+      else if(fit_metric == "bootstrap_summary")
+        res <- bootstrap_pluck_summary(fit)
       else if(fit_metric == "error_and_cosine")
         res <- bootstrap_pluck_error_and_cosine(fit)
       else if(fit_metric == "error_and_cosine_bootstraps")
