@@ -60,9 +60,20 @@ sig_analyse_mutations(
   copynumber = read.csv(path_copynumber),
   structuralvariant = read.csv(path_sv),
   ref = "hg19", 
-  ref_tallies = path_reference_tallies,
+  ref_tallies = path_reference_tallies, 
+  output_dir = "./signatures"
   )
 ```
+
+3. Create a reference matrix
+
+```{r}
+sig_create_reference_set(
+  path_to_signature_directory = "./signatures",
+  outfolder = "./reference"
+  )
+```
+
 
 ``
 
