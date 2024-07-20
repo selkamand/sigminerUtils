@@ -4,4 +4,5 @@
 .httr-oauth
 .DS_Store
 signatures/
+references/
 my_sig_database.sqlite

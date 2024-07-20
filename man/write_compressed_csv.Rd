@@ -4,7 +4,7 @@
 \alias{write_compressed_csv}
 \title{Write compressed CSV}
 \usage{
-write_compressed_csv(x, file)
+write_compressed_csv(x, file, row.names = FALSE)
 }
 \arguments{
 \item{x}{the object to be written, preferably a matrix or data frame.
@@ -12,6 +12,10 @@ write_compressed_csv(x, file)
 
 \item{file}{either a character string naming a file or a \link{connection}
     open for writing.  \code{""} indicates output to the console.}
+
+\item{row.names}{either a logical value indicating whether the row
+    names of \code{x} are to be written along with \code{x}, or a
+    character vector of row names to be written.}
 }
 \description{
 Write compressed CSV

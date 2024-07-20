@@ -12,14 +12,19 @@
 #' @param n_bootstraps The number of bootstrap iterations for fitting signatures. Default is 100.
 #' @param temp_dir The temporary directory for storing intermediate files. Default is tempdir().
 #' @param db_sbs,db_indel,db_dbs,db_cn a signature collection data.frame where rows are channels and columns are signatures.
+#' @param ref_tallies path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using [sig_create_reference_set()].
+#' If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.
 #' @param cores Number of cores to use.
 #' @return None.
 #' @export
 #' @importFrom rlang `%||%`
 #'
-#'
-#'
-sig_analyse_mutations <- function(maf, copynumber = NULL, structuralvariant = NULL, db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL, ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"), n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
+sig_analyse_mutations <- function(
+    maf, copynumber = NULL, structuralvariant = NULL,
+    db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
+    ref_tallies = NULL,
+    ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"),
+    n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
 
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
@@ -264,18 +269,37 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, structuralvariant = NU
   }
 
   write_tally_matrix <- function(matrix, class, output_dir, ref){
-
     samples = colnames(tally_ls[[1]])
 
     df_longform_tally <- fix_tally(matrix)
     ls_longform <- split(df_longform_tally, f = df_longform_tally[["SampleID"]])
     for (sample in names(ls_longform)){
-      tmp_tally_outfile = glue::glue("{output_dir}/{class}_catalogue.{sample}.{ref}.tally.csv")
+      tmp_tally_outfile = glue::glue("{output_dir}/{class}_catalogue.{sample}.{ref}.tally.csv.gz")
+      df_tally <- dplyr::select(ls_longform[[sample]], -SampleID)
+      df_tally <- dplyr::rename(df_tally, channel=Context, count=Count, fraction=CountRelative)
+      #if(class == "SV38") browser()
+      df_tally[["channel"]] <- sigstash::sig_convert_channel_name(df_tally[["channel"]], from = "sigminer", to = "cosmic")
+      df_tally[["type"]] <- sigstash::sig_convert_channel2type(df_tally[["channel"]], sigclass = class)
+      df_tally <- df_tally[c("channel", "type", "fraction", "count")]
+
       write_compressed_csv(
-        x = dplyr::select(ls_longform[[sample]], -SampleID),
+        x = df_tally,
         file = tmp_tally_outfile
       )
-      cli::cli_alert_success("SBS96 tally written to csv: {.path {tmp_tally_outfile}.gz}")
+      cli::cli_alert_success("SBS96 tally written to csv: {.path {tmp_tally_outfile}}")
+
+      # Compare to Reference Set
+      if(!is.null(ref_tallies)){
+        tally_similarity_outfile = glue::glue("{output_dir}/{class}_comparison.{sample}.{ref}.similarity.csv.gz")
+        cli::cli_alert_info("Computing tally similarity to reference dataset: {.file {ref_tallies}}")
+
+        df_similarity <- compute_similarity_against_reference_set(tally_file = tmp_tally_outfile, ref_tallies = ref_tallies)
+        write_compressed_csv(
+          x = df_similarity,
+          file = tally_similarity_outfile
+        )
+        cli::cli_alert_success("Similarities written to csv : {.path {tmp_tally_outfile}.gz}")
+      }
     }
   }
 
@@ -369,8 +393,9 @@ sig_analyse_mutations <- function(maf, copynumber = NULL, structuralvariant = NU
       dplyr::summarise(
         boxplotstats::calculate_boxplot_stats(ContributionRelative, outliers_as_strings = TRUE),
         experimental_pval = sigstats::sig_compute_experimental_p_value(ContributionRelative, threshold = 0.05),
-        .by = Sig
+        .by = c(SampleID, Sig)
         )
+    df_summary
     return(df_summary)
   }
 

@@ -7,10 +7,12 @@
 sig_analyse_mutations(
   maf,
   copynumber = NULL,
+  structuralvariant = NULL,
   db_sbs = NULL,
   db_indel = NULL,
   db_dbs = NULL,
   db_cn = NULL,
+  db_sv = NULL,
   ref = c("hg38", "hg19"),
   output_dir = "./signatures",
   exposure_type = c("absolute", "relative"),
