@@ -13,6 +13,7 @@ sig_analyse_mutations(
   db_dbs = NULL,
   db_cn = NULL,
   db_sv = NULL,
+  ref_tallies = NULL,
   ref = c("hg38", "hg19"),
   output_dir = "./signatures",
   exposure_type = c("absolute", "relative"),
@@ -27,6 +28,9 @@ sig_analyse_mutations(
 \item{copynumber}{The input copynumber data.frame. See \code{\link[sigminer:read_copynumber]{sigminer::read_copynumber()}} for details.}
 
 \item{db_sbs, db_indel, db_dbs, db_cn}{a signature collection data.frame where rows are channels and columns are signatures.}
+
+\item{ref_tallies}{path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using \code{\link[=sig_create_reference_set]{sig_create_reference_set()}}.
+If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.}
 
 \item{ref}{A character vector specifying the reference genome. One of 'hg38' or 'hg19'.}
 

@@ -52,15 +52,11 @@ path_maf <-  system.file(package = "sigminerUtils", path = "test.maf")
 path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
 path_sv <- system.file(package = "sigminerUtils", path = "test.sv.csv") 
 
-# Database of reference of sample catalogues
-path_reference_tallies <- system.file(package = "sigminerUtils", path = "reference/refmatrix.tally.parquet")
-
 sig_analyse_mutations(
   maf = path_maf, 
   copynumber = read.csv(path_copynumber),
   structuralvariant = read.csv(path_sv),
   ref = "hg19", 
-  ref_tallies = path_reference_tallies, 
   output_dir = "./signatures"
   )
 ```
@@ -76,6 +72,26 @@ sig_create_reference_set(
 
 
 ``
+4. Use reference matrix to rerun your signature analysis
+```{r}
+# Variant Files
+path_maf <-  system.file(package = "sigminerUtils", path = "test.maf") 
+path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
+path_sv <- system.file(package = "sigminerUtils", path = "test.sv.csv") 
+
+# Database of reference of sample catalogues
+path_reference_tallies <- system.file(package = "sigminerUtils", path = "reference/refmatrix.tally.parquet")
+
+sig_analyse_mutations(
+  maf = path_maf, 
+  copynumber = read.csv(path_copynumber),
+  structuralvariant = read.csv(path_sv),
+  ref = "hg19", 
+  ref_tallies = path_reference_tallies
+  output_dir = "./signatures"
+  )
+
+```
 
 
 3. Load results from output folder into the database

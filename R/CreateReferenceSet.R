@@ -3,10 +3,17 @@
 #' Point to a folder full of outputs from \strong{sigminerUtils::sig_analyse_mutations()} and create
 #'
 #' @return this function is run for its side effects. Invisibly returns NULL.
+#' @param umap_n_neighbours This parameter sets the balance between local and global structure in UMAP.
+#' The value determines the size of the local neighborhood UMAP which is used to learn the manifold structure of the data.
+#' Lower values focus on local details. higher values emphasise more global patterns. Must be less than the number of samples in your dataset.
 #' @export
 #'
-#' @examples
-sig_create_reference_set <- function(path_to_signature_directory = "signatures/", outfolder = "reference", format=c("parquet", "csv.gz")){
+sig_create_reference_set <- function(
+    path_to_signature_directory = "signatures/",
+    outfolder = "reference",
+    format=c("parquet", "csv.gz"),
+    umap_n_neighbours=15
+    ){
   # ---- Assertions ---- #
   format <- rlang::arg_match(format)
   cli::cli_alert_info
@@ -40,9 +47,86 @@ sig_create_reference_set <- function(path_to_signature_directory = "signatures/"
   }
   cli::cli_alert_success("Tally refmatrix succesfully created")
 
+
+  # Create UMAP reference ---------------------------------------------------
+  # To do this properly,
+
+  # Lets turn each feature in our tally into a a column and each sample into a row (values are fraction) - then we can create
+  # a UMAP (1 for each sigclass and 1 with all combined)
+  cli::cli_h1("UMAPs (from sample catalogues)")
+  cli::cli_progress_step("Building UMAPs from sample catalogues")
+  df_umap_tbl <- df_expanded |>
+    # Convert NAs that are due to sum of count being zero to Zeros
+    # (so that when we pivot to wide format, any NAs introduced are because that sample wasn't run on that
+    # class of signature analysis)
+    dplyr::mutate(fraction = ifelse(is.na(fraction), yes = 0, no = fraction)) |>
+    tidyr::pivot_wider(id_cols = c("sample"), names_from = c(class, channel), names_sep = "|", values_from = fraction) |>
+    tibble::column_to_rownames(var = "sample")
+
+  all_classes <- unique(df_expanded$class)
+  cli::cli_h2("UMAPs for each signature class")
+  for (curr_class in all_classes){
+    outfile_umap <- glue::glue_safe("{outfolder}/refmatrix.{curr_class}.umap.rds.bz2")
+
+    cli::cli_progress_step("Bulding UMAP for class {curr_class}")
+    class_specific_table <- df_umap_tbl |>
+      dplyr::select(starts_with(paste0(curr_class, "|")))
+
+    # Prepare dataset (with all samples which were run for this type of signature analysis)
+    n_samples <- nrow(class_specific_table)
+    class_specific_table_no_missing <- class_specific_table |>
+      dplyr::filter(dplyr::if_all(dplyr::everything(), ~!is.na(.)))
+    n_samples_with_tallys_for_currrent_class <- nrow(class_specific_table_no_missing)
+    cli::cli_alert_info("{n_samples_with_tallys_for_currrent_class}/{n_samples} have had features extracted and counted as part of {curr_class} signature analysis. Umap will be built using only these {n_samples_with_tallys_for_currrent_class}")
+
+    # Check umap_n_neighbours paramater is appropriate for this dataset
+    if(n_samples_with_tallys_for_currrent_class < umap_n_neighbours) {
+      cli::cli_abort("{.arg umap_n_neighbours} must be smaller than the number of samples in your dataset (<={n_samples_with_tallys_for_currrent_class})")
+    }
+
+    # Perform UMAP
+    umap <- umap::umap(d = class_specific_table_no_missing, n_neighbors = umap_n_neighbours, method = "naive", preserve.seed = TRUE)
+
+    # Write to Umap to compressed Rds file (will be used in predictions)
+    cli::cli_progress_step("Writing {curr_class} umap reference to {.file {outfile_umap}}")
+    saveRDS(umap,compress = "bzip2", file = outfile_umap)
+  }
+
+  cli::cli_h2("UMAP from all signature classes")
+
+  # Do the same UMAP using ALL features across all signature types
+  cli::cli_progress_step("Building a single UMAP using ALL features accross all signature classes")
+
+  # Prepare dataset (with all samples which were run for this type of signature analysis)
+  n_samples <- nrow(df_umap_tbl)
+  class_specific_table_no_missing <- df_umap_tbl |>
+    dplyr::filter(dplyr::if_all(dplyr::everything(), ~!is.na(.)))
+  n_samples_with_tallys_for_currrent_class <- nrow(class_specific_table_no_missing)
+  cli::cli_alert_info("{n_samples_with_tallys_for_currrent_class}/{n_samples} have had features extracted and counted for All signature analyses. Umap will be built using only these {n_samples_with_tallys_for_currrent_class}")
+
+  # Check theres enough samples to perform at all
+  if(n_samples_with_tallys_for_currrent_class == 0){
+    cli::cli_abort("No samples have been analysed on against signature classes [{all_classes}]")
+  }
+
+  # Check umap_n_neighbours paramater is appropriate for this dataset
+  if(n_samples_with_tallys_for_currrent_class < umap_n_neighbours) {
+    cli::cli_abort("{.arg umap_n_neighbours} must be smaller than the number of samples in your dataset (<={n_samples_with_tallys_for_currrent_class})")
+  }
+
+  # Perform UMAP
+  umap <- umap::umap(d = class_specific_table_no_missing, n_neighbors = umap_n_neighbours, method = "naive", preserve.seed = TRUE)
+
+  outfile_umap <- paste0(outfolder, "/refmatrix.panclass.umap.rds.bz2")
+
+  # Write results
+  cli::cli_progress_step("Writing pan-class umap reference to {outfile_umap}")
+  saveRDS(umap,compress = "bzip2", file = outfile_umap)
+
   # Clean up memory
   remove(df)
   remove(df_expanded)
+  remove(umap)
 
 
   # ---- Exposures ---- #

@@ -5,4 +5,5 @@
 .DS_Store
 signatures/
 references/
+reference/
 my_sig_database.sqlite
