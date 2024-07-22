@@ -8,10 +8,13 @@ sig_create_reference_set(
   path_to_signature_directory = "signatures/",
   outfolder = "reference",
   format = c("parquet", "csv.gz"),
+  create_umaps = TRUE,
   umap_n_neighbours = 15
 )
 }
 \arguments{
+\item{create_umaps}{should umap references be created (flag)}
+
 \item{umap_n_neighbours}{This parameter sets the balance between local and global structure in UMAP.
 The value determines the size of the local neighborhood UMAP which is used to learn the manifold structure of the data.
 Lower values focus on local details. higher values emphasise more global patterns. Must be less than the number of samples in your dataset.}

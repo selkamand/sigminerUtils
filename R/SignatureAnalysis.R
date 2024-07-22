@@ -280,18 +280,21 @@ sig_analyse_mutations <- function(
       #if(class == "SV38") browser()
       df_tally[["channel"]] <- sigstash::sig_convert_channel_name(df_tally[["channel"]], from = "sigminer", to = "cosmic")
       df_tally[["type"]] <- sigstash::sig_convert_channel2type(df_tally[["channel"]], sigclass = class)
+      df_tally[["fraction"]] <- ifelse(is.na(df_tally[["fraction"]]), yes = 0, no = df_tally[["fraction"]])
       df_tally <- df_tally[c("channel", "type", "fraction", "count")]
 
       write_compressed_csv(
         x = df_tally,
         file = tmp_tally_outfile
       )
-      cli::cli_alert_success("SBS96 tally written to csv: {.path {tmp_tally_outfile}}")
+      cli::cli_alert_success("{class} tally written to csv: {.path {tmp_tally_outfile}}")
 
       # Compare to Reference Set
       if(!is.null(ref_tallies)){
         tally_similarity_outfile = glue::glue("{output_dir}/{class}_comparison.{sample}.{ref}.similarity.csv.gz")
         cli::cli_alert_info("Computing tally similarity to reference dataset: {.file {ref_tallies}}")
+
+        #if(sample == "TCGA-CA-6717-01" & class == "ID83") browser()
 
         df_similarity <- compute_similarity_against_reference_set(tally_file = tmp_tally_outfile, ref_tallies = ref_tallies)
         write_compressed_csv(
