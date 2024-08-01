@@ -6,6 +6,7 @@
 #'
 #' @param maf The input MAF file. Can be a maf object or the path to a MAF file
 #' @param copynumber The input copynumber data.frame. See [sigminer::read_copynumber()] for details.
+#' @param structuralvariant The input structural variant data.frame. See [sigminer::read_sv_as_rs()] for details
 #' @param ref A character vector specifying the reference genome. One of 'hg38' or 'hg19'.
 #' @param output_dir The output directory for storing results. Default is "./signatures".
 #' @param exposure_type The type of exposure. Can be "absolute" or "relative". One of "absolute" or "relative"
