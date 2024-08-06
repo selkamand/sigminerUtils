@@ -71,7 +71,7 @@ sig_analyse_mutations <- function(
   # Create Output directory
   if(!file.exists(output_dir)){
     cli::cli_alert_info("Creating Output Directory at: {.path {output_dir}}")
-    dir.create(output_dir)
+    dir.create(output_dir, recursive = TRUE)
   }
   cli::cli_alert_info("Output Directory: {.path {output_dir}}")
   cli::cli_alert_info("Reference Genome: {.strong {ref_genome}}")

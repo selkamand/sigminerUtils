@@ -77,7 +77,7 @@ sig_create_reference_set(
 Using a reference matrix allows samples to be compared to a reference database
 ```{r}
 # Variant Files
-path_maf <-  system.file(package = "sigminerUtils", path = "test.maf") 
+path_maf <-  system.file(package = "sigminerUtils", path = "test.maf")
 path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
 path_sv <- system.file(package = "sigminerUtils", path = "test.sv.csv") 
 
