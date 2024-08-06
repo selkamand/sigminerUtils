@@ -14,25 +14,30 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
 Imports: 
+    arrow,
     assertions,
+    boxplotstats (>= 0.0.0.9000),
     cli,
     DBI,
     dplyr,
     future,
     glue,
     lsa,
+    purrr,
     R.utils,
     readr,
     rlang,
     RSQLite,
     sigminer (>= 2.2.1),
     sigstash,
+    sigstats (>= 0.0.0.9000),
     tibble,
     tidyr,
     umap,
     utils
-Remotes:
+Remotes: 
     selkamand/sigstash,
-    selkamand/sigstats
+    selkamand/sigstats,
+    selkamand/boxplotstats
 URL: https://github.com/selkamand/sigminerUtils
 BugReports: https://github.com/selkamand/sigminerUtils/issues
