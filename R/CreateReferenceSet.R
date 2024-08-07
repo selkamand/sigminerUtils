@@ -24,9 +24,13 @@ sig_create_reference_set <- function(
 
   outfile_tally <- paste0(outfolder, "/refmatrix.tally.", format)
   outfile_exposures <- paste0(outfolder, "/refmatrix.exposures.", format)
+  outfile_bootstraps <- paste0(outfolder, "/refmatrix.bootstraps.", format)
 
   assertions::assert_file_does_not_exist(outfile_tally)
   assertions::assert_file_does_not_exist(outfile_exposures)
+  assertions::assert_file_does_not_exist(outfile_bootstraps)
+
+
 
   # Get data.frame describing every catalogue in the reference directory (based on files with .tally extension)
   df_catalogues <- get_catalogue_dataframe(path_to_signature_directory)
@@ -50,8 +54,11 @@ sig_create_reference_set <- function(
   cli::cli_h1("Exposure Reference Matrix")
   build_exposures_reference_set(df_exposures, outfile_exposures, format=format)
 
-
+  # ---- Bootstraps ---- #
+  df_bootstraps <- get_boostrap_summary_dataframe(path_to_signature_directory)
+  build_bootstrap_reference_set(df_bootstraps, outfile_bootstraps, format=format)
   return(invisible(NULL))
+
 }
 
 
@@ -64,7 +71,7 @@ sig_create_reference_set <- function(
 #' @return a data.frame with 1 row per path, that includes filename-encoded metadata and a list-column with dataframes (contents)
 #' @export
 #'
-parse_sig_files <- function(x){
+parse_sig_files <- function(x, colClasses = NA){
   filenames=basename(x)
   ls_res = strsplit(basename(x), split = "\\.")
 
@@ -82,7 +89,7 @@ parse_sig_files <- function(x){
       "extension" = paste0(v[5:length(v)], collapse = "."),
       "filename" = filename,
       "filepath" = filepath,
-      "contents" = list(read.csv(filepath, header = TRUE))
+      "contents" = list(read.csv(filepath, header = TRUE, colClasses = colClasses))
       )
 
     })
@@ -95,7 +102,7 @@ parse_sig_files <- function(x){
 }
 
 get_catalogue_dataframe <- function(path_to_signature_directory){
-  path_catalogues <- dir(path_to_signature_directory, pattern = "\\.tally", full.names = TRUE)
+  path_catalogues <- dir(path_to_signature_directory, pattern = "\\.tally", full.names = TRUE, recursive = TRUE)
 
   # Nested dataframe with 1 row per catalogue file (including a list-column with the full catalogue)
   df <- parse_sig_files(path_catalogues)
@@ -112,7 +119,7 @@ get_catalogue_dataframe <- function(path_to_signature_directory){
 }
 
 get_exposures_dataframe <- function(path_to_signature_directory){
-  path_exposures <- dir(path_to_signature_directory, pattern = "\\.expo\\.", full.names = TRUE)
+  path_exposures <- dir(path_to_signature_directory, pattern = "\\.expo\\.", full.names = TRUE, recursive = TRUE)
 
   if(length(path_exposures) == 0){
     cli::cli_alert_warning("Skipping exposure reference set creation (no expo files describing signature contributions were found)")
@@ -125,9 +132,27 @@ get_exposures_dataframe <- function(path_to_signature_directory){
 
   return(df_exposures)
 }
+
+get_boostrap_summary_dataframe <- function(path_to_signature_directory){
+  path <- dir(path_to_signature_directory, pattern = "\\.bootstrap_summary\\.", full.names = TRUE, recursive = TRUE)
+
+  if(length(path) == 0){
+    cli::cli_alert_warning("Skipping boostrap summary reference set creation (no bootstrap summary files were found)")
+    return(invisible(NULL))
+  }
+
+  df_bootstraps_nested <- parse_sig_files(path, colClasses = c(outliers = "character"))
+  df_bootstraps <- df_bootstraps_nested |>
+    dplyr::select(class, sample, contents) |>
+    tidyr::unnest(contents)
+
+  return(df_bootstraps)
+}
+
 build_catalogue_reference_set <- function(df_catalogues, outfile_tally, format){
   cli::cli_alert_info("Reading Catalalogue Tallies")
   cli::cli_alert_info("Writing tally refmatrix to {outfile_tally}")
+
   if(format == "parquet"){
     df_catalogues |>
       dplyr::group_by(class,sample) |>
@@ -220,6 +245,21 @@ build_exposures_reference_set <- function(df_exposures, outfile, format){
   }
   else{
     df_exposures |>
+      readr::write_csv(outfile)
+  }
+
+  cli::cli_alert_success("Exposure refmatrix successfully created")
+}
+
+build_bootstrap_reference_set <- function(df_bootstraps, outfile, format){
+  cli::cli_alert_info("Reading Signature Exposure Results")
+  if(format == "parquet"){
+    df_bootstraps |>
+      dplyr::group_by(class,sample) |>
+      arrow::write_dataset(outfile, format = "parquet")
+  }
+  else{
+    df_bootstraps |>
       readr::write_csv(outfile)
   }
 
