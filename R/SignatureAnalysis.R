@@ -439,7 +439,7 @@ sig_analyse_mutations <- function(
   write_model_outputs(fit = dbs78_fit, fit_type = "DBS78", output_dir = output_dir, ref = ref)
   write_model_outputs(fit = id83_fit, fit_type = "ID83", output_dir = output_dir, ref = ref)
   if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref)
-  if(sv) write_model_outputs(fit = cn48_fit, fit_type = "SV32", output_dir = output_dir, ref = ref)
+  if(sv) write_model_outputs(fit = sv32_fit, fit_type = "SV32", output_dir = output_dir, ref = ref)
 
 }
 
