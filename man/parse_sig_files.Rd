@@ -4,7 +4,7 @@
 \alias{parse_sig_files}
 \title{Parse Signature Analysis Output Files}
 \usage{
-parse_sig_files(x)
+parse_sig_files(x, colClasses = NA)
 }
 \arguments{
 \item{x}{paths to any file produced by sig_analyse_mutations (character vector)}

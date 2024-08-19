@@ -89,13 +89,26 @@ sig_analyse_mutations <- function(
   assertions::assert_class(maf, class = "MAF", msg = "maf input in an unexpected format. Please supply maf argument as either a path to a MAF file, a data.frame with MAF columns, or a MAF object from maftools. If you're input format is acceptable please check that your file/object conforms to the MAF specification")
 
   cli::cli_h2("Tally (Small Variants)")
-  tally <- sigminer::sig_tally(
+  tally_sbs <- tally(
     object = maf,
-    mode = "ALL",
+    mode = "SBS",
     ref_genome = ref_genome,
-    keep_only_matrix = FALSE,
     cores = cores
   )
+
+  tally_dbs <- tally(
+    object = maf,
+    mode = "DBS",
+    ref_genome = ref_genome,
+    cores = cores
+  )
+
+  tally_id <- tally(
+    object = maf,
+    mode = "ID",
+    ref_genome = ref_genome,
+    cores = cores
+    )
 
   if(cn){
     cli::cli_h2("Tally (CopyNumber)")
@@ -124,12 +137,16 @@ sig_analyse_mutations <- function(
   }
 
   cli::cli_h2("Fitting")
-  sbs_96_matrices <- t(tally$SBS_96)
-  id_83_matrices <- t(tally$ID_83)
-  dbs_78_matrices <- t(tally$DBS_78)
+
+  samples <- unique(maf@data$Tumor_Sample_Barcode)
+  sbs_96_matrices <- postprocess_tally_matrix(tally_sbs$all_matrices$SBS_96, samples = samples, class = "SBS96")
+  id_83_matrices <- postprocess_tally_matrix(tally_id$all_matrices$ID_83, samples = samples, class = "ID83")
+  dbs_78_matrices <- postprocess_tally_matrix(tally_dbs$all_matrices$DBS_78, samples = samples, class = "DBS78")
 
   # Matrices without sig databases
-  sbs_1536_matrices <- t(tally$SBS_1536)
+  sbs_1536_matrices <-  postprocess_tally_matrix(tally_sbs$all_matrices$SBS_1536, samples = samples, class = "SBS1536")
+  dbs_1248_matrices <- postprocess_tally_matrix(tally_dbs$all_matrices$DBS_1248, samples = samples, class = "DBS1248")
+
 
   if(cn) {
     cn_48_matrices <- t(tally_copynumber_steele$all_matrices$CN_48)
@@ -177,7 +194,7 @@ sig_analyse_mutations <- function(
     result_dir = temp_dir,
     #mode = "SBS",
     type = exposure_type # could be 'relative' or 'absolute'
-  )
+  ) |> try() |> try_error_to_null()
 
   cli::cli_h3("INDELS (ID83)")
   ## Indel
@@ -196,7 +213,7 @@ sig_analyse_mutations <- function(
     result_dir = temp_dir,
     mode = "ID",
     type = exposure_type # could be 'relative' or 'absolute'
-  )
+  ) |> try() |> try_error_to_null()
 
   cli::cli_h3("Doublet Mutations (DBS78)")
   dbs78_fit <- sigminer::sig_fit_bootstrap_batch(
@@ -214,7 +231,7 @@ sig_analyse_mutations <- function(
     result_dir = temp_dir,
     mode = "DBS",
     type = exposure_type # could be 'relative' or 'absolute'
-  )
+  ) |> try() |> try_error_to_null()
 
   if(cn){
     cli::cli_h3("Copy Number Alterations (CN48)")
@@ -233,11 +250,10 @@ sig_analyse_mutations <- function(
       result_dir = temp_dir,
       #mode = "copynumber",
       type = exposure_type # could be 'relative' or 'absolute'
-    )
+    ) |> try() |> try_error_to_null()
   }
 
   if(sv){
-    #browser()
     cli::cli_h3("Structural Variants (SV32)")
     sv32_fit <- sigminer::sig_fit_bootstrap_batch(
       catalog = sv_32_matrices,
@@ -253,7 +269,7 @@ sig_analyse_mutations <- function(
       job_id = NULL,
       result_dir = temp_dir,
       type = exposure_type # could be 'relative' or 'absolute'
-    )
+    ) |> try() |> try_error_to_null()
   }
 
   cli::cli_h2("Write Output")
@@ -406,10 +422,16 @@ sig_analyse_mutations <- function(
 
   write_model_outputs <- function(output_dir, fit, fit_type = "SBS96", ref){
 
+    # Skip if fit is NULL (means there were no mutations of fit_type)
+    if(is.null(fit)) {
+      cli::cli_alert_warning("No model outputs produced for class {fit_type}")
+      return(NULL)
+    }
+
     for (fit_metric in c(
       "expo", "expo_bootstraps", "bootstrap_summary" , "error_and_cosine", "error_and_cosine_bootstraps",  "p_val")
       ){
-
+      if(fit_type == "ID83") {browser()}
       if(fit_metric == "expo")
         res <- bootstrap_pluck_expo(fit)
       else if(fit_metric == "expo_bootstraps")
