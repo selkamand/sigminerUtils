@@ -294,7 +294,6 @@ sig_analyse_mutations <- function(
       tmp_tally_outfile = glue::glue("{output_dir}/{class}_catalogue.{sample}.{ref}.tally.csv.gz")
       df_tally <- dplyr::select(ls_longform[[sample]], -SampleID)
       df_tally <- dplyr::rename(df_tally, channel=Context, count=Count, fraction=CountRelative)
-      #if(class == "SV38") browser()
       df_tally[["channel"]] <- sigstash::sig_convert_channel_name(df_tally[["channel"]], from = "sigminer", to = "cosmic")
       df_tally[["type"]] <- sigstash::sig_convert_channel2type(df_tally[["channel"]], sigclass = class)
       df_tally[["fraction"]] <- ifelse(is.na(df_tally[["fraction"]]), yes = 0, no = df_tally[["fraction"]])
@@ -310,9 +309,6 @@ sig_analyse_mutations <- function(
       if(!is.null(ref_tallies)){
         tally_similarity_outfile = glue::glue("{output_dir}/{class}_comparison.{sample}.{ref}.similarity.csv.gz")
         cli::cli_alert_info("Computing tally similarity to reference dataset: {.file {ref_tallies}}")
-
-        #if(sample == "TCGA-CA-6717-01" & class == "ID83") browser()
-
         df_similarity <- compute_similarity_against_reference_set(tally_file = tmp_tally_outfile, ref_tallies = ref_tallies)
         write_compressed_csv(
           x = df_similarity,
@@ -431,7 +427,6 @@ sig_analyse_mutations <- function(
     for (fit_metric in c(
       "expo", "expo_bootstraps", "bootstrap_summary" , "error_and_cosine", "error_and_cosine_bootstraps",  "p_val")
       ){
-      if(fit_type == "ID83") {browser()}
       if(fit_metric == "expo")
         res <- bootstrap_pluck_expo(fit)
       else if(fit_metric == "expo_bootstraps")
