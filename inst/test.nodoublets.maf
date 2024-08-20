@@ -1,0 +1,10 @@
+Tumor_Sample_Barcode	Chromosome	Start_Position	End_Position	Reference_Allele	Tumor_Seq_Allele2	Hugo_Symbol	Consequence	HGVSp_Short	DNA_VAF	SIFT	PolyPhen
+TCGA-A2-A0T5-01	11	6413025	6413025	G	A	SMPD1	Missense_Mutation	p.G244R	0.32	deleterious(0)	probably_damaging(1)
+TCGA-A2-A0T5-01	11	94532825	94532825	C	T	AMOTL1	Missense_Mutation	p.R157C	0.4	deleterious(0)	probably_damaging(0.997)
+TCGA-A2-A0T5-01	12	6981575	6981575	G	C	SPSB2	Missense_Mutation	p.P164R	0.28	deleterious(0)	possibly_damaging(0.702)
+TCGA-A2-A0T5-01	15	66206100	66206100	C	T	MEGF11	Missense_Mutation	p.M895I	0.23	tolerated(0.55)	benign(0.004)
+TCGA-A2-A0T5-01	15	72492076	72492076	T	C	PKM	Missense_Mutation	p.K504R	0.24	tolerated(0.21)	benign(0.017)
+TCGA-A2-A0T5-01	17	72842998	72842998	G	A	GRIN2C	Missense_Mutation	p.T688M	0.39	deleterious(0)	probably_damaging(1)
+TCGA-A2-A0T5-01	22	26829825	26829825	C	A	ASPHD2	Missense_Mutation	p.Q82K	0.17	tolerated_low_confidence(0.05)	benign(0.301)
+TCGA-A2-A0T5-01	22	41573243	41573243	A	C	EP300	Missense_Mutation	p.Q1843P	0.32	""	benign(0.003)
+TCGA-A2-A0T5-01	4	123333833	123333833	C	T	ADAD1	Missense_Mutation	p.P373L	0.31	deleterious(0.04)	benign(0.077)
