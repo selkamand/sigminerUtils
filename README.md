@@ -65,7 +65,7 @@ sig_create_reference_set(
   )
 ```
 
-\`\` 4. Use reference matrix to rerun your signature analysis
+4.  Use reference matrix to rerun your signature analysis
 
 Using a reference matrix allows samples to be compared to a reference
 database
