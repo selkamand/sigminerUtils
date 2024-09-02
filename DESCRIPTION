@@ -29,15 +29,17 @@ Imports:
     rlang,
     RSQLite,
     sigminer (>= 2.2.1),
+    sigstart (>= 0.0.0.9000),
     sigstash,
     sigstats (>= 0.0.0.9000),
     tibble,
     tidyr,
     umap,
     utils
-Remotes: 
+Remotes:  
     selkamand/sigstash,
     selkamand/sigstats,
-    selkamand/boxplotstats
+    selkamand/boxplotstats,
+    selkamand/sigstart
 URL: https://github.com/selkamand/sigminerUtils
 BugReports: https://github.com/selkamand/sigminerUtils/issues

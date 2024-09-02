@@ -8,6 +8,22 @@ parse_sig_files(x, colClasses = NA)
 }
 \arguments{
 \item{x}{paths to any file produced by sig_analyse_mutations (character vector)}
+
+\item{colClasses}{character.  A vector of classes to be assumed for
+    the columns.  If unnamed, recycled as necessary.  If named, names
+    are matched with unspecified values being taken to be \code{NA}.
+
+    Possible values are \code{NA} (the default, when
+    \code{\link[utils]{type.convert}} is used), \code{"NULL"} (when the column
+    is skipped), one of the atomic vector classes (logical, integer,
+    numeric, complex, character, raw), or \code{"factor"}, \code{"Date"}
+    or \code{"POSIXct"}.  Otherwise there needs to be an \code{as}
+    method (from package \pkg{methods}) for conversion from
+    \code{"character"} to the specified formal class.
+
+    Note that \code{colClasses} is specified per column (not per
+    variable) and so includes the column of row names (if any).
+  }
 }
 \value{
 a data.frame with 1 row per path, that includes filename-encoded metadata and a list-column with dataframes (contents)

@@ -10,7 +10,6 @@ sig_analyse_mutations_single_sample_from_files(
   segment = NULL,
   vcf_sv = NULL,
   pass_only = TRUE,
-  structuralvariant = NULL,
   exclude_sex_chromosomes = TRUE,
   allow_multisample = TRUE,
   db_sbs = NULL,
@@ -32,15 +31,19 @@ sig_analyse_mutations_single_sample_from_files(
 
 \item{vcf_snv}{A character string specifying the path to the VCF file.}
 
-\item{pass_only}{A logical value indicating whether to filter variants to include only those with a "PASS" filter status. Default is TRUE.}
+\item{segment}{path to segment file produced by purple (TUMOR.purple.cnv.somatic.tsv)}
 
-\item{structuralvariant}{The input structural variant data.frame. See \code{\link[sigminer:read_sv_as_rs]{sigminer::read_sv_as_rs()}} for details}
+\item{vcf_sv}{path to a vcf file produced by GRIDSS / PURPLE (purple SV VCFs are typically the better choice since those are produced post-gripss filtering)}
+
+\item{pass_only}{only return breakpoints where FILTER=PASS}
+
+\item{exclude_sex_chromosomes}{drop sex chromosomes from dataframe output}
 
 \item{allow_multisample}{Do NOT throw an error for VCFs with >2 samples.
 Added since some tumor-normal pipelines add a third sample describing RNA genotypes of mutations found in DNA and these 3-sample VCFs would fail purely because they have 3 samples present.
 Whether TRUE/FALSE, this function still assumes every mutation in the VCF relates to the \code{sample_id} supplied, so please exclude any homozygous ref alleles for your sample of interest upstream.}
 
-\item{db_sbs, db_indel, db_dbs, db_cn}{a signature collection data.frame where rows are channels and columns are signatures.}
+\item{db_sbs, db_indel, db_dbs, db_cn, db_sv}{a signature collection data.frame where rows are channels and columns are signatures.}
 
 \item{ref_tallies}{path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using \code{\link[=sig_create_reference_set]{sig_create_reference_set()}}.
 If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.}
@@ -62,4 +65,30 @@ None.
 }
 \description{
 Run all signature mutation analyses possible from file inputs.
+}
+\examples{
+\dontrun{
+path_snvs <- system.file(
+  "colo829_testfiles/COLO829v003T.purple.somatic.vcf.gz",
+  package = "sigminerUtils"
+)
+path_cnvs <- system.file(
+  "colo829_testfiles/COLO829v003T.purple.cnv.somatic.tsv",
+  package = "sigminerUtils"
+)
+path_svs <- system.file(
+  "colo829_testfiles/COLO829v003T.purple.sv.vcf.gz",
+  package = "sigminerUtils"
+)
+
+sig_analyse_mutations_single_sample_from_files(
+  sample_id = "COLO829v003T",
+  vcf_snv = path_snvs,
+  segment = path_cnvs,
+  vcf_sv = path_svs,
+  pass_only = TRUE,
+  ref = "hg38",
+  output_dir = "colo829_signature_results"
+)
+}
 }

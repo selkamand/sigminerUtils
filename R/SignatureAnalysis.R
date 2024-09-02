@@ -12,7 +12,7 @@
 #' @param exposure_type The type of exposure. Can be "absolute" or "relative". One of "absolute" or "relative"
 #' @param n_bootstraps The number of bootstrap iterations for fitting signatures. Default is 100.
 #' @param temp_dir The temporary directory for storing intermediate files. Default is tempdir().
-#' @param db_sbs,db_indel,db_dbs,db_cn a signature collection data.frame where rows are channels and columns are signatures.
+#' @param db_sbs,db_indel,db_dbs,db_cn,db_sv a signature collection data.frame where rows are channels and columns are signatures.
 #' @param ref_tallies path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using [sig_create_reference_set()].
 #' If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.
 #' @param cores Number of cores to use.
@@ -475,18 +475,45 @@ sort_so_rownames_match <- function(data, rowname_desired_order){
 #' Run all signature mutation analyses possible from file inputs.
 #'
 #' @inheritParams sig_analyse_mutations
+#' @inheritParams sigstart::parse_purple_cnv_to_sigminer
+#' @inheritParams sigstart::parse_purple_sv_vcf_to_sigminer
 #' @inheritParams sigstart::parse_vcf_to_sigminer_maf
 #' @param sample_id string representing the tumour sample identifier (in your VCFs and other files).
 #' @return None.
 #' @export
 #'
+#' @examples
+#' \dontrun{
+#' path_snvs <- system.file(
+#'   "colo829_testfiles/COLO829v003T.purple.somatic.vcf.gz",
+#'   package = "sigminerUtils"
+#' )
+#' path_cnvs <- system.file(
+#'   "colo829_testfiles/COLO829v003T.purple.cnv.somatic.tsv",
+#'   package = "sigminerUtils"
+#' )
+#' path_svs <- system.file(
+#'   "colo829_testfiles/COLO829v003T.purple.sv.vcf.gz",
+#'   package = "sigminerUtils"
+#' )
+#'
+#' sig_analyse_mutations_single_sample_from_files(
+#'   sample_id = "COLO829v003T",
+#'   vcf_snv = path_snvs,
+#'   segment = path_cnvs,
+#'   vcf_sv = path_svs,
+#'   pass_only = TRUE,
+#'   ref = "hg38",
+#'   output_dir = "colo829_signature_results"
+#' )
+#' }
+
 sig_analyse_mutations_single_sample_from_files <- function(
     sample_id,
     vcf_snv = NULL,
     segment = NULL,
     vcf_sv = NULL,
     pass_only = TRUE,
-    structuralvariant = NULL,
     exclude_sex_chromosomes = TRUE,
     allow_multisample = TRUE,
     db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
@@ -504,23 +531,86 @@ sig_analyse_mutations_single_sample_from_files <- function(
     if(!is.null(segment)) assertions::assert_file_exists(segment)
     if(!is.null(vcf_sv)) assertions::assert_file_exists(vcf_sv)
 
+
+    # Create Output Directory
+    if (!dir.exists(output_dir)) {
+      dir.create(output_dir, recursive = TRUE, showWarnings = TRUE)
+    }
+
+
+    # Create a directory for this sample
+    sample_dir <- paste0(output_dir, "/", sample_id)
+    if (file.exists(sample_dir)) {
+      error <- glue::glue_safe("Sample folder already exists. To overwrite please manually delete [{sample_dir}]")
+      cli::cli_abort(error)
+    }
+    cli::cli_progress_step("Creating Output Directory at {.file {sample_dir}}")
+    dir.create(sample_dir, recursive = TRUE, showWarnings = TRUE)
+
+
     # Parse the variant files into sigminer-compatible formats
     small_variants <- if(!is.null(vcf_snv)) sigstart::parse_vcf_to_sigminer_maf(vcf_snv = vcf_snv, sample_id = sample_id, pass_only = pass_only, allow_multisample = allow_multisample) else NULL
     cnvs <- if(!is.null(segment)) sigstart::parse_purple_cnv_to_sigminer(segment = segment, sample_id = sample_id, exclude_sex_chromosomes = exclude_sex_chromosomes) else NULL
     svs <- if(!is.null(vcf_sv)) sigstart::parse_purple_sv_vcf_to_sigminer(vcf_sv = vcf_sv, sample_id = sample_id, pass_only = pass_only) else NULL
 
+
+    # Create a log with just the most important info about each run
+    sample_log <- glue::glue_safe("{sample_dir}/{sample_id}.summary.log")
+    file.create(sample_log, overwrite = TRUE)
+
+    # Mine versions from VCFs
+    snv_versions <- if(!is.null(vcf_snv)) vcf2versions(vcf_snv) else "No SNV VCF supplied"
+    sv_versions <- if(!is.null(vcf_sv))  vcf2versions(vcf_sv) else "No SV VCF supplied"
+
+    # Write VCF versions to logfile
+    write(glue::glue("\n\nSNV VCF versions:\n{snv_versions}"), sample_log, append = TRUE)
+    write(glue::glue("\n\nSV VCF versions:\n{sv_versions}"), sample_log, append = TRUE)
+
+
+    # Create an additional logfile for sigminerUtils output
+    sigminer_log <- glue::glue_safe("{sample_dir}/{sample_id}.sigminer.log")
+    file.create(sigminer_log, overwrite = TRUE)
+
+    # Sink all sigminer messages to sigminer.log
+    # zz <- file(sigminer_log, open = "wt")
+    # sink(type = "message", file = zz, split = TRUE)
+
+
+    cli::cli_h2("Running Signature Analysis. This will take some time")
     # Run the signature analysis
-    sig_analyse_mutations(
-      maf = small_variants,
-      copynumber = cnvs,
-      structuralvariant = svs,
-      db_sbs = db_sbs, db_indel = db_indel, db_dbs = db_dbs, db_cn = db_cn, db_sv = db_sv,
-      ref_tallies=ref_tallies,
-      ref = ref,
-      output_dir = output_dir,
-      exposure_type = exposure_type,
-      n_bootstraps = n_bootstraps,
-      temp_dir = temp_dir,
-      cores = cores
-    )
+    try_output <- try({ # Try so we can explicitly log failure
+      capture_messages(logfile = sigminer_log, expr = {
+          sig_analyse_mutations(
+          maf = small_variants,
+          copynumber = cnvs,
+          structuralvariant = svs,
+          db_sbs = db_sbs, db_indel = db_indel, db_dbs = db_dbs, db_cn = db_cn, db_sv = db_sv,
+          ref_tallies=ref_tallies,
+          ref = ref,
+          output_dir = sample_dir,
+          exposure_type = exposure_type,
+          n_bootstraps = n_bootstraps,
+          temp_dir = temp_dir,
+          cores = cores
+      )})
+    })
+
+    # Revert output to console
+    # sink(type = "message")
+    # close(zz)
+
+    # Figure out if sigminer run failed
+    sample_failed <- "try-error" %in% class(try_output)
+
+    # Finished Successfully / Failed (update sample_log with result)
+    if(sample_failed){
+      cli::cli_alert_warning("Sample {biosample_id} Failed")
+      write(glue::glue_safe("\n\nSample Failed. See {sigminer_log} for details"), sample_log, append = TRUE)
+      write(paste0(biosample_id, " (sigminer failed)"), failed_samples, append = TRUE)
+      stop("Signature analysis failed for: ", sample_id, ". Please see ", sigminer_log, " for details")
+    }
+    else{
+      cli::cli_progress_step("Finished successfully")
+      write("\n\nFinished successfully!", sample_log, append = TRUE)
+    }
 }

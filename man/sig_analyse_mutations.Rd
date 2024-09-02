@@ -29,7 +29,7 @@ sig_analyse_mutations(
 
 \item{structuralvariant}{The input structural variant data.frame. See \code{\link[sigminer:read_sv_as_rs]{sigminer::read_sv_as_rs()}} for details}
 
-\item{db_sbs, db_indel, db_dbs, db_cn}{a signature collection data.frame where rows are channels and columns are signatures.}
+\item{db_sbs, db_indel, db_dbs, db_cn, db_sv}{a signature collection data.frame where rows are channels and columns are signatures.}
 
 \item{ref_tallies}{path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using \code{\link[=sig_create_reference_set]{sig_create_reference_set()}}.
 If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.}

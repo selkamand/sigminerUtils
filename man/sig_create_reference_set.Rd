@@ -13,6 +13,12 @@ sig_create_reference_set(
 )
 }
 \arguments{
+\item{path_to_signature_directory}{path to signature directory}
+
+\item{outfolder}{path to save reference set}
+
+\item{format}{format to save reference set as (parquet or bgzipped csv)}
+
 \item{create_umaps}{should umap references be created (flag)}
 
 \item{umap_n_neighbours}{This parameter sets the balance between local and global structure in UMAP.

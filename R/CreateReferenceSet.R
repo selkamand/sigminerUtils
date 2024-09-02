@@ -3,6 +3,9 @@
 #' Point to a folder full of outputs from \strong{sigminerUtils::sig_analyse_mutations()} and create
 #'
 #' @return this function is run for its side effects. Invisibly returns NULL.
+#' @param path_to_signature_directory path to signature directory
+#' @param outfolder path to save reference set
+#' @param format format to save reference set as (parquet or bgzipped csv)
 #' @param umap_n_neighbours This parameter sets the balance between local and global structure in UMAP.
 #' The value determines the size of the local neighborhood UMAP which is used to learn the manifold structure of the data.
 #' Lower values focus on local details. higher values emphasise more global patterns. Must be less than the number of samples in your dataset.
@@ -67,7 +70,7 @@ sig_create_reference_set <- function(
 #' Parse Signature Analysis Output Files
 #'
 #' @param x paths to any file produced by sig_analyse_mutations (character vector)
-#'
+#' @inheritParams  utils::read.csv
 #' @return a data.frame with 1 row per path, that includes filename-encoded metadata and a list-column with dataframes (contents)
 #' @export
 #'
@@ -89,7 +92,7 @@ parse_sig_files <- function(x, colClasses = NA){
       "extension" = paste0(v[5:length(v)], collapse = "."),
       "filename" = filename,
       "filepath" = filepath,
-      "contents" = list(read.csv(filepath, header = TRUE, colClasses = colClasses))
+      "contents" = list(utils::read.csv(filepath, header = TRUE, colClasses = colClasses))
       )
 
     })
@@ -287,7 +290,7 @@ compute_similarity_against_reference_set <- function(tally_file = "./signatures/
 
   ls_reference_tallies <- df_reference_tallies |>
     dplyr::group_split(.keep = FALSE) |>
-    setNames(keys)
+    stats::setNames(keys)
 
   similarities <- purrr::map_dbl(
     ls_reference_tallies,

@@ -1,3 +1,17 @@
+vcf2versions <- function(path_to_vcf){
+  versions <- readLines(path_to_vcf) |> grep(x = _, "^##.*[V]ersion", value = T)
+  versions <- gsub(x = versions, "#", "")
+  versions_collapsed <- paste0(versions, collapse = "\n")
+  return(versions_collapsed)
+}
+
+
+capture_messages <- function(logfile, expr) {
+  messages <- utils::capture.output(expr, type = "message")
+  cat(messages, file = logfile, append = TRUE, sep = "\n")
+  cat(messages, sep = "\n")
+}
+
 #' Write compressed CSV
 #'
 #' @inheritParams utils::write.csv
@@ -8,7 +22,6 @@ write_compressed_csv <- function(x, file, row.names = FALSE){
   file <- sub(x=file, pattern = "\\.gz", replacement = "")
 
   utils::write.csv(x, file, row.names = row.names)
-  #R.utils::gzip(file, ext="gz", overwrite = TRUE)
   R.utils::bzip2(file, ext="gz", overwrite = TRUE)
 }
 
@@ -85,9 +98,12 @@ replace_null_with_empty_matrix <- function(x, class, samples){
   sigminer_initiate_empty(class, samples)
 }
 
-#' Return an empty matrix
+#' Return an 0-initialised matrix
 #'
+#' Return a 0-initialised matrix of Sample IDs X Signature Channels
 #'
+#' @param class class of signatures to return (e.g. one of SBS96, SBS1536, ID83, ID28, DBS78, and DBS1248). Matrix returned will have 1 column per channel of the selected signature class.
+#' @param samples a vector of sample IDs will become rows of the returned matrix
 sigminer_initiate_empty <- function(class, samples){
 
   ls_channels <- sigminer_channels()

@@ -2,10 +2,15 @@
 % Please edit documentation in R/utils.R
 \name{sigminer_initiate_empty}
 \alias{sigminer_initiate_empty}
-\title{Return an empty matrix}
+\title{Return an 0-initialised matrix}
 \usage{
 sigminer_initiate_empty(class, samples)
 }
+\arguments{
+\item{class}{class of signatures to return (e.g. one of SBS96, SBS1536, ID83, ID28, DBS78, and DBS1248). Matrix returned will have 1 column per channel of the selected signature class.}
+
+\item{samples}{a vector of sample IDs will become rows of the returned matrix}
+}
 \description{
-Return an empty matrix
+Return a 0-initialised matrix of Sample IDs X Signature Channels
 }
