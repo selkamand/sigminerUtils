@@ -469,3 +469,58 @@ sort_so_rownames_match <- function(data, rowname_desired_order){
 
   return(data[indexes,])
 }
+
+#' Mutational Signature Analysis
+#'
+#' Run all signature mutation analyses possible from file inputs.
+#'
+#' @inheritParams sig_analyse_mutations
+#' @inheritParams sigstart::parse_vcf_to_sigminer_maf
+#' @param sample_id string representing the tumour sample identifier (in your VCFs and other files).
+#' @return None.
+#' @export
+#'
+sig_analyse_mutations_single_sample_from_files <- function(
+    sample_id,
+    vcf_snv = NULL,
+    segment = NULL,
+    vcf_sv = NULL,
+    pass_only = TRUE,
+    structuralvariant = NULL,
+    exclude_sex_chromosomes = TRUE,
+    allow_multisample = TRUE,
+    db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
+    ref_tallies = NULL,
+    ref = c('hg38', 'hg19'),
+    output_dir = "./signatures",
+    exposure_type = c("absolute", "relative"),
+    n_bootstraps = 100,
+    temp_dir = tempdir(),
+    cores = future::availableCores())
+  {
+
+    # Check files exist
+    if(!is.null(vcf_snv)) assertions::assert_file_exists(vcf_snv)
+    if(!is.null(segment)) assertions::assert_file_exists(segment)
+    if(!is.null(vcf_sv)) assertions::assert_file_exists(vcf_sv)
+
+    # Parse the variant files into sigminer-compatible formats
+    small_variants <- if(!is.null(vcf_snv)) sigstart::parse_vcf_to_sigminer_maf(vcf_snv = vcf_snv, sample_id = sample_id, pass_only = pass_only, allow_multisample = allow_multisample) else NULL
+    cnvs <- if(!is.null(segment)) sigstart::parse_purple_cnv_to_sigminer(segment = segment, sample_id = sample_id, exclude_sex_chromosomes = exclude_sex_chromosomes) else NULL
+    svs <- if(!is.null(vcf_sv)) sigstart::parse_purple_sv_vcf_to_sigminer(vcf_sv = vcf_sv, sample_id = sample_id, pass_only = pass_only) else NULL
+
+    # Run the signature analysis
+    sig_analyse_mutations(
+      maf = small_variants,
+      copynumber = cnvs,
+      structuralvariant = svs,
+      db_sbs = db_sbs, db_indel = db_indel, db_dbs = db_dbs, db_cn = db_cn, db_sv = db_sv,
+      ref_tallies=ref_tallies,
+      ref = ref,
+      output_dir = output_dir,
+      exposure_type = exposure_type,
+      n_bootstraps = n_bootstraps,
+      temp_dir = temp_dir,
+      cores = cores
+    )
+}

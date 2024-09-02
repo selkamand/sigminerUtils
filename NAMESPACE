@@ -3,6 +3,7 @@
 export(parse_sig_files)
 export(sig_add_to_database)
 export(sig_analyse_mutations)
+export(sig_analyse_mutations_single_sample_from_files)
 export(sig_create_database)
 export(sig_create_reference_set)
 export(sig_pairwise_similarity)
