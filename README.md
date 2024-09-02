@@ -27,6 +27,12 @@ remotes::install_github('selkamand/sigminerUtils')
 
 ## Usage
 
+Load required packages
+
+``` r
+library(sigminerUtils)
+```
+
 1.  Start by creating a Signature database
 
 ``` r
@@ -36,17 +42,52 @@ sig_create_database('./my_sig_database.sqlite', overwrite = TRUE)
 2.  Run Signature Analysis
 
 ``` r
+# Variant Files
 path_maf <-  system.file(package = "sigminerUtils", path = "test.maf") 
 path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
+path_sv <- system.file(package = "sigminerUtils", path = "test.sv.csv") 
 
 sig_analyse_mutations(
   maf = path_maf, 
-  read.csv(path_copynumber),
-  ref = "hg19"
+  copynumber = read.csv(path_copynumber),
+  structuralvariant = read.csv(path_sv),
+  ref = "hg19", 
+  output_dir = "./signatures"
   )
 ```
 
-\`\`
+3.  Create a reference matrix
+
+``` r
+sig_create_reference_set(
+  path_to_signature_directory = "./signatures",
+  outfolder = "./reference"
+  )
+```
+
+\`\` 4. Use reference matrix to rerun your signature analysis
+
+Using a reference matrix allows samples to be compared to a reference
+database
+
+``` r
+# Variant Files
+path_maf <-  system.file(package = "sigminerUtils", path = "test.maf")
+path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
+path_sv <- system.file(package = "sigminerUtils", path = "test.sv.csv") 
+
+# Database of reference of sample catalogues
+path_reference_tallies <- system.file(package = "sigminerUtils", path = "reference/refmatrix.tally.parquet")
+
+sig_analyse_mutations(
+  maf = path_maf, 
+  copynumber = read.csv(path_copynumber),
+  structuralvariant = read.csv(path_sv),
+  ref = "hg19", 
+  ref_tallies = path_reference_tallies,
+  output_dir = "./signatures"
+)
+```
 
 3.  Load results from output folder into the database
 
@@ -66,10 +107,9 @@ sample_metadata <- data.frame(
 sig_add_to_database('./signatures', './my_sig_database.sqlite', ref = "hg19", metadata = sample_metadata)
 ```
 
-
 ### Run in Single Sample Mode from Oncoanalyser outputs
 
-```
+``` r
 path_snvs <- system.file("colo829_testfiles/COLO829v003T.purple.somatic.vcf.gz", package = "sigminerUtils")
 path_cnvs <- system.file("colo829_testfiles/COLO829v003T.purple.cnv.somatic.tsv", package = "sigminerUtils")
 path_svs <-  system.file("colo829_testfiles/COLO829v003T.purple.sv.vcf.gz", package = "sigminerUtils")

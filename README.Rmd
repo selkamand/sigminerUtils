@@ -37,6 +37,12 @@ remotes::install_github('selkamand/sigminerUtils')
 
 ## Usage
 
+Load required packages
+
+```{r, eval = TRUE}
+library(sigminerUtils)
+```
+
 1. Start by creating a Signature database
 
 ```{r, eval = FALSE}
@@ -46,7 +52,7 @@ sig_create_database('./my_sig_database.sqlite', overwrite = TRUE)
 
 2. Run Signature Analysis
 
-```{r, eval = FALSE}
+```{r, eval=FALSE}
 # Variant Files
 path_maf <-  system.file(package = "sigminerUtils", path = "test.maf") 
 path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
@@ -63,7 +69,7 @@ sig_analyse_mutations(
 
 3. Create a reference matrix
 
-```{r}
+```{r, eval=FALSE}
 sig_create_reference_set(
   path_to_signature_directory = "./signatures",
   outfolder = "./reference"
@@ -75,7 +81,7 @@ sig_create_reference_set(
 4. Use reference matrix to rerun your signature analysis
 
 Using a reference matrix allows samples to be compared to a reference database
-```{r}
+```{r, eval=FALSE}
 # Variant Files
 path_maf <-  system.file(package = "sigminerUtils", path = "test.maf")
 path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
@@ -114,3 +120,18 @@ sig_add_to_database('./signatures', './my_sig_database.sqlite', ref = "hg19", me
 ```
 
 
+
+### Run in Single Sample Mode from Oncoanalyser outputs
+
+```{r, eval = FALSE}
+path_snvs <- system.file("colo829_testfiles/COLO829v003T.purple.somatic.vcf.gz", package = "sigminerUtils")
+path_cnvs <- system.file("colo829_testfiles/COLO829v003T.purple.cnv.somatic.tsv", package = "sigminerUtils")
+path_svs <-  system.file("colo829_testfiles/COLO829v003T.purple.sv.vcf.gz", package = "sigminerUtils")
+
+sig_analyse_mutations_single_sample_from_files(
+  sample_id = "COLO829v003T", vcf_snv = path_snvs, segment = path_cnvs, vcf_sv = path_svs,
+  pass_only = TRUE,
+  ref = "hg38",
+  output_dir = "colo829_signature_results"
+)
+```
