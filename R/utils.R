@@ -1,3 +1,23 @@
+#' Parse Signature Database.
+#'
+#' If db is a string, assumes it is a path to a csv_tidy formatted file and parses it into a sigminer (wide) format.
+#' If db is not a string, returns db.
+#'
+#' @param db a signature collection
+#' @param dbtype a string describing the db type (e.g. 'db_sbs', 'db_sv', etc)
+#'
+#' @return sigminer formatted signature collection if db is a string, else returns db
+#'
+db_read_if_filepath <- function(db, dbtype = "A"){
+  if(is.character(db) & length(db) == 1) {
+    cli::cli_alert_info("{dbtype} signature collection was supplied as a string. Attempting to read as a file (assuming csv_tidy format)")
+    signature_collection <- sigstash::sig_read_signatures(filepath = db, format = "csv_tidy")
+    sig_collection_to_sigminer(signature_collection)
+  }
+  else
+    return(db)
+}
+
 vcf2versions <- function(path_to_vcf){
   versions <- readLines(path_to_vcf) |> grep(x = _, "^##.*[V]ersion", value = T)
   versions <- gsub(x = versions, "#", "")

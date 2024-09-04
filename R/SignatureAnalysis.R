@@ -12,7 +12,7 @@
 #' @param exposure_type The type of exposure. Can be "absolute" or "relative". One of "absolute" or "relative"
 #' @param n_bootstraps The number of bootstrap iterations for fitting signatures. Default is 100.
 #' @param temp_dir The temporary directory for storing intermediate files. Default is tempdir().
-#' @param db_sbs,db_indel,db_dbs,db_cn,db_sv a signature collection data.frame where rows are channels and columns are signatures.
+#' @param db_sbs,db_indel,db_dbs,db_cn,db_sv a signature collection data.frame where rows are channels and columns are signatures. Row names should be signature channels. See \code{sigstash::sig_load("COSMIC_v3.4_SBS_GRCh38", format = "sigminer")}  for an example. Alternatively, you can supply a path to signature collections in tidy_csv format (see [sigstash::sig_read_signatures()] for details)
 #' @param ref_tallies path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using [sig_create_reference_set()].
 #' If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.
 #' @param cores Number of cores to use.
@@ -59,6 +59,14 @@ sig_analyse_mutations <- function(
   db_dbs <- db_dbs %||% default_dbs
   db_cn <- db_cn %||% default_cn
   db_sv <- db_sv %||% default_sv
+
+  # If user supplies string as a signature db, assume its a file (in csv_tidy format) and parse it to a sigminer-compatible format
+  db_sbs <- db_read_if_filepath(db_sbs, dbtype="db_sbs")
+  db_indel <- db_read_if_filepath(db_indel, dbtype="db_indel")
+  db_dbs <- db_read_if_filepath(db_dbs, dbtype="db_dbs")
+  db_cn <- db_read_if_filepath(db_cn, dbtype="db_cn")
+  db_sv <- db_read_if_filepath(db_sv, dbtype="db_sv")
+
 
   # Pick appropriate reference gene
   if(ref == "hg19"){
@@ -507,7 +515,6 @@ sort_so_rownames_match <- function(data, rowname_desired_order){
 #'   output_dir = "colo829_signature_results"
 #' )
 #' }
-
 sig_analyse_mutations_single_sample_from_files <- function(
     sample_id,
     vcf_snv = NULL,
@@ -577,7 +584,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
 
 
     cli::cli_h2("Running Signature Analysis. This will take some time")
-    # Run the signature analysis
+
     try_output <- try({ # Try so we can explicitly log failure
       capture_messages(logfile = sigminer_log, expr = {
           sig_analyse_mutations(
@@ -594,10 +601,6 @@ sig_analyse_mutations_single_sample_from_files <- function(
           cores = cores
       )})
     })
-
-    # Revert output to console
-    # sink(type = "message")
-    # close(zz)
 
     # Figure out if sigminer run failed
     sample_failed <- "try-error" %in% class(try_output)
