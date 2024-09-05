@@ -160,8 +160,13 @@ sig_analyse_mutations <- function(
     cn_48_matrices <- t(tally_copynumber_steele$all_matrices$CN_48)
 
     # Matrices without sig databases (might need to replace with simpler versions
-    cn_80_wang_matrices <- t(tally_copynumber_wang$nmf_matrix)
     cn_176_tao_matrices <- t(tally_copynumber_tao$all_matrices$standard_matrix)
+    cn_80_wang_matrices <- t(tally_copynumber_wang$nmf_matrix)
+
+    #Hotfix for cn80_wang_matrices which lack a sample names.
+    # Can Remove once issue https://github.com/ShixiangWang/sigminer/issues/465 is resolved.
+    # Can test by checking if there CN80 tally includes sample 'V1')
+    colnames(cn_80_wang_matrices) <- colnames(cn_48_matrices)
   }
 
   if(sv){
@@ -349,7 +354,6 @@ sig_analyse_mutations <- function(
   for (class in names(tally_ls)){
     write_tally_matrix(matrix = tally_ls[[class]], class = class, output_dir=output_dir,ref=ref)
   }
-
   cli::cli_h3("Fit (Exposures)")
 
   # Functions to pluck different types
@@ -465,7 +469,6 @@ sig_analyse_mutations <- function(
   write_model_outputs(fit = id83_fit, fit_type = "ID83", output_dir = output_dir, ref = ref)
   if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref)
   if(sv) write_model_outputs(fit = sv32_fit, fit_type = "SV32", output_dir = output_dir, ref = ref)
-
 }
 
 
@@ -544,7 +547,6 @@ sig_analyse_mutations_single_sample_from_files <- function(
       dir.create(output_dir, recursive = TRUE, showWarnings = TRUE)
     }
 
-
     # Create a directory for this sample
     sample_dir <- paste0(output_dir, "/", sample_id)
     if (file.exists(sample_dir)) {
@@ -563,7 +565,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
 
     # Create a log with just the most important info about each run
     sample_log <- glue::glue_safe("{sample_dir}/{sample_id}.summary.log")
-    file.create(sample_log, overwrite = TRUE)
+    file.create(sample_log)
 
     # Mine versions from VCFs
     snv_versions <- if(!is.null(vcf_snv)) vcf2versions(vcf_snv) else "No SNV VCF supplied"
@@ -576,7 +578,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
 
     # Create an additional logfile for sigminerUtils output
     sigminer_log <- glue::glue_safe("{sample_dir}/{sample_id}.sigminer.log")
-    file.create(sigminer_log, overwrite = TRUE)
+    file.create(sigminer_log)
 
     # Sink all sigminer messages to sigminer.log
     # zz <- file(sigminer_log, open = "wt")
