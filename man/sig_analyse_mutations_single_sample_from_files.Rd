@@ -43,7 +43,9 @@ sig_analyse_mutations_single_sample_from_files(
 Added since some tumor-normal pipelines add a third sample describing RNA genotypes of mutations found in DNA and these 3-sample VCFs would fail purely because they have 3 samples present.
 Whether TRUE/FALSE, this function still assumes every mutation in the VCF relates to the \code{sample_id} supplied, so please exclude any homozygous ref alleles for your sample of interest upstream.}
 
-\item{db_sbs, db_indel, db_dbs, db_cn, db_sv}{a signature collection data.frame where rows are channels and columns are signatures. Row names should be signature channels. See \code{sigstash::sig_load("COSMIC_v3.4_SBS_GRCh38", format = "sigminer")}  for an example. Alternatively, you can supply a path to signature collections in tidy_csv format (see \code{\link[sigstash:sig_read_signatures]{sigstash::sig_read_signatures()}} for details)}
+\item{db_sbs, db_indel, db_dbs, db_cn, db_sv}{a signature collection data.frame where rows are channels and columns are signatures. Row names should be signature channels.
+See \code{sigstash::sig_load("COSMIC_v3.4_SBS_GRCh38", format = "sigminer")}  for an example.
+Alternatively, you can supply a path to signature collections in tidy_csv format (see \code{\link[sigstash:sig_read_signatures]{sigstash::sig_read_signatures()}} for details)}
 
 \item{ref_tallies}{path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using \code{\link[=sig_create_reference_set]{sig_create_reference_set()}}.
 If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.}

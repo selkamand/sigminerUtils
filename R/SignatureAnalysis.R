@@ -12,7 +12,11 @@
 #' @param exposure_type The type of exposure. Can be "absolute" or "relative". One of "absolute" or "relative"
 #' @param n_bootstraps The number of bootstrap iterations for fitting signatures. Default is 100.
 #' @param temp_dir The temporary directory for storing intermediate files. Default is tempdir().
-#' @param db_sbs,db_indel,db_dbs,db_cn,db_sv a signature collection data.frame where rows are channels and columns are signatures. Row names should be signature channels. See \code{sigstash::sig_load("COSMIC_v3.4_SBS_GRCh38", format = "sigminer")}  for an example. Alternatively, you can supply a path to signature collections in tidy_csv format (see [sigstash::sig_read_signatures()] for details)
+#' @param min_contribution_threshold The minimum contribution threshold a signature must surpass for it to count as 'present' in a bootstrap (typically 0.05). This is referred to as the sparsity threshold. See [sigstats::sig_compute_experimental_p_value()] for details.
+#' @param db_sbs,db_indel,db_dbs,db_cn,db_sv a signature collection data.frame where rows are channels and columns are signatures. Row names should be signature channels.
+#' See \code{sigstash::sig_load("COSMIC_v3.4_SBS_GRCh38", format = "sigminer")}  for an example.
+#' Alternatively, you can supply a path to signature collections in tidy_csv format (see [sigstash::sig_read_signatures()] for details)
+#' @param db_sbs_name,db_indel_name,db_dbs_name,db_cn_name,db_sv_name names of signature databases (used for logs). If NULL, will try and lookup using [sigstash::sig_identify_collection()].
 #' @param ref_tallies path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using [sig_create_reference_set()].
 #' If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.
 #' @param cores Number of cores to use.
@@ -23,9 +27,14 @@
 sig_analyse_mutations <- function(
     maf, copynumber = NULL, structuralvariant = NULL,
     db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
+    db_sbs_name = NULL, db_indel_name = NULL, db_dbs_name = NULL, db_cn_name = NULL, db_sv_name = NULL,
     ref_tallies = NULL,
+    min_contribution_threshold = 0.05,
     ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"),
     n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
+
+  # TODO: REMOVE locale setting once sigstash issue https://github.com/selkamand/sigstash/issues/43 is resolved
+  Sys.setlocale("LC_COLLATE", "C")
 
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
@@ -67,6 +76,21 @@ sig_analyse_mutations <- function(
   db_cn <- db_read_if_filepath(db_cn, dbtype="db_cn")
   db_sv <- db_read_if_filepath(db_sv, dbtype="db_sv")
 
+  # If signature collection names are NULL, see if we can identify based on their md5
+  if(!is.null(db_sbs)) db_sbs_name <- db_sbs_name %||% sigstash::sig_identify_collection(db_sbs, return = 'name')
+  if(!is.null(db_indel)) db_indel_name <- db_indel_name %||% sigstash::sig_identify_collection(db_indel, return = 'name')
+  if(!is.null(db_dbs)) db_dbs_name <- db_dbs_name %||% sigstash::sig_identify_collection(db_dbs, return = 'name')
+  if(!is.null(db_cn)) db_cn_name <- db_cn_name %||% sigstash::sig_identify_collection(db_cn, return = 'name')
+  if(!is.null(db_sv)) db_sv_name <- db_sv_name %||% sigstash::sig_identify_collection(db_sv, return = 'name')
+
+
+  # If signature collection names couldn't be identified, throw an error
+  assertions::assert(is.null(db_sbs) | db_sbs_name != "Uncertain", msg = "For logging purposes, signature collections must be named. Either supply name to {.arg db_sbs_name} argument or use a sigstash collection whose name can be identified using sigstash::sig_identify_collection()")
+  assertions::assert(is.null(db_indel) | db_indel_name != "Uncertain", msg = "For logging purposes, signature collections must be named. Either supply name to {.arg db_indel_name} argument or use a sigstash collection whose name can be identified using sigstash::sig_identify_collection()")
+  assertions::assert(is.null(db_dbs) | db_dbs_name != "Uncertain", msg = "For logging purposes, signature collections must be named. Either supply name to {.arg db_dbs_name} argument or use a sigstash collection whose name can be identified using sigstash::sig_identify_collection()")
+  assertions::assert(is.null(db_cn) | db_cn_name != "Uncertain", msg = "For logging purposes, signature collections must be named. Either supply name to {.arg db_cn_name} argument or use a sigstash collection whose name can be identified using sigstash::sig_identify_collection()")
+  assertions::assert(is.null(db_sv) | db_sv_name != "Uncertain", msg = "For logging purposes, signature collections must be named. Either supply name to {.arg db_sv_name} argument or use a sigstash collection whose name can be identified using sigstash::sig_identify_collection()")
+
 
   # Pick appropriate reference gene
   if(ref == "hg19"){
@@ -83,6 +107,29 @@ sig_analyse_mutations <- function(
   }
   cli::cli_alert_info("Output Directory: {.path {output_dir}}")
   cli::cli_alert_info("Reference Genome: {.strong {ref_genome}}")
+
+  # Log which signature databases were used
+  sigdbs_log <- glue::glue_safe("{output_dir}/signature_collections.csv")
+  file.create(sigdbs_log)
+  dbname_map = c(
+    "SBS96" = db_sbs_name,
+    "ID83" = db_indel_name,
+    "DBS78" = db_dbs_name,
+    "CN48" = db_cn_name,
+    "SV32" = db_sv_name
+  )
+  db_names <- data.frame(collection_type = names(dbname_map), dataset = unname(dbname_map))
+  write.csv(db_names, file = sigdbs_log, row.names = FALSE)
+
+  # Log which thresholds were used
+  thresholds_log <- glue::glue_safe("{output_dir}/thresholds.csv")
+  file.create(thresholds_log)
+  thresholds_map = c(
+    "min_contribution_threshold" = min_contribution_threshold
+  )
+  df_thresholds <- data.frame(threshold = names(thresholds_map), value = unname(thresholds_map))
+  write.csv(df_thresholds, file = thresholds_log, row.names = FALSE)
+
 
   # Read MAF file if supplied as filepath
   if(is.character(maf))
@@ -420,7 +467,7 @@ sig_analyse_mutations <- function(
     df_summary <- df_bootstraps |>
       dplyr::summarise(
         boxplotstats::calculate_boxplot_stats(ContributionRelative, outliers_as_strings = TRUE),
-        experimental_pval = sigstats::sig_compute_experimental_p_value(ContributionRelative, threshold = 0.05),
+        experimental_pval = sigstats::sig_compute_experimental_p_value(ContributionRelative, threshold = min_contribution_threshold),
         .by = c(SampleID, Sig)
         )
     df_summary
@@ -609,9 +656,8 @@ sig_analyse_mutations_single_sample_from_files <- function(
 
     # Finished Successfully / Failed (update sample_log with result)
     if(sample_failed){
-      cli::cli_alert_warning("Sample {biosample_id} Failed")
+      cli::cli_alert_warning("Sample {sample_id} Failed")
       write(glue::glue_safe("\n\nSample Failed. See {sigminer_log} for details"), sample_log, append = TRUE)
-      write(paste0(biosample_id, " (sigminer failed)"), failed_samples, append = TRUE)
       stop("Signature analysis failed for: ", sample_id, ". Please see ", sigminer_log, " for details")
     }
     else{
