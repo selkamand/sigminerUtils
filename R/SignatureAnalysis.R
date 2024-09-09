@@ -433,9 +433,9 @@ sig_analyse_mutations <- function(
     fit$expo |>
       dplyr::rename(SampleID = sample, Contribution = exposure, Sig=sig, Method = method, Type = type)  |>
       dplyr::filter(Type == "optimal") |>
-      dplyr::select(-Type, -Method) |>
       dplyr::mutate(ContributionRelative = Contribution / sum(Contribution, na.rm = TRUE), .by = c(SampleID, Type)) |>
       dplyr::left_join(df_bootstrap_summary, by = c("SampleID", "Sig")) |>
+      dplyr::select(-Type, -Method) |>
       dplyr::relocate(.after = dplyr::everything(), c(Contribution, ContributionRelative))
   }
 
