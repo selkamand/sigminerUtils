@@ -2,7 +2,9 @@
 
 #' Mutational Signature Analysis
 #'
-#' Run all signature mutation analyses possible from MAF inputs on
+#' Screen datasets for known mutational signatures by
+#' supplying both sample mutation data and collections of known
+#' signatures.
 #'
 #' @param maf The input MAF file. Can be a maf object or the path to a MAF file
 #' @param copynumber The input copynumber data.frame. See [sigminer::read_copynumber()] for details.
@@ -12,7 +14,7 @@
 #' @param exposure_type The type of exposure. Can be "absolute" or "relative". One of "absolute" or "relative"
 #' @param n_bootstraps The number of bootstrap iterations for fitting signatures. Default is 100.
 #' @param temp_dir The temporary directory for storing intermediate files. Default is tempdir().
-#' @param min_contribution_threshold The minimum contribution threshold a signature must surpass for it to count as 'present' in a bootstrap (typically 0.05). This is referred to as the sparsity threshold. See [sigstats::sig_compute_experimental_p_value()] for details.
+#' @param min_contribution_threshold The minimum contribution threshold a signature must surpass for it to count as 'present' in a bootstrap (typically 0.05). This is sometimes referred to as the sparsity threshold. See [sigstats::sig_compute_experimental_p_value()] for details.
 #' @param db_sbs,db_indel,db_dbs,db_cn,db_sv a signature collection data.frame where rows are channels and columns are signatures. Row names should be signature channels.
 #' See \code{sigstash::sig_load("COSMIC_v3.4_SBS_GRCh38", format = "sigminer")}  for an example.
 #' Alternatively, you can supply a path to signature collections in tidy_csv format (see [sigstash::sig_read_signatures()] for details)
@@ -23,6 +25,22 @@
 #' @return None.
 #' @export
 #' @importFrom rlang `%||%`
+#'
+#' @details
+#' Produces the following files:
+#'
+#' Per Run:
+#' signature_collections.csv: Describes the signature collection used COSMIC_v3.4_SBS_GRCh38
+#'  thresholds.csv: Describes any the thresholds that were used
+#'
+#' For each signature class:
+#' <signatureclass>_catalogue.<sampleid>.<refgenome>.tally.csv.gz: A tally of mutations in the sample by channel.
+#' <signatureclass>_fit.<sampleid>.<refgenome>.expo.csv.gz: The signature model produced by sigminer (% contribution of each signature). Annotated with p-val from bootstrap_summary.csv.gz
+#' <signatureclass>_fit.<sampleid>.<refgenome>.bootstrap_summary.csv.gz: A signature-level summary of stability across bootstraps. Includes experimentally defined P-values.
+#' <signatureclass>_fit.<sampleid>.<refgenome>.expo_bootstraps.csv.gz: The optimal signature model produced in each bootstrap.
+#' <signatureclass>_fit.<sampleid>.<refgenome>.error_and_cosine.csv.gz: Error and cosine similarity of signature model VS original data (unfiltered model, so may include unstable signatures)
+#' <signatureclass>_fit.<sampleid>.<refgenome>.error_and_cosine_bootstraps.csv.gz: Error and cosine similarity of each bootstraps optimal signature model vs original data (unfiltered model, so may include unstable signatures).
+#' <signatureclass>_fit.<sampleid>.<refgenome>.p_val.csv.gz: Per-signature p value computed by sigminer. Note this is different to the p-value in bootstrap_summary and expo datasets (we recommend using the latter, which has been added for greater consistency with other signature pipelines).
 #'
 sig_analyse_mutations <- function(
     maf, copynumber = NULL, structuralvariant = NULL,
@@ -92,7 +110,7 @@ sig_analyse_mutations <- function(
   assertions::assert(is.null(db_sv) | db_sv_name != "Uncertain", msg = "For logging purposes, signature collections must be named. Either supply name to {.arg db_sv_name} argument or use a sigstash collection whose name can be identified using sigstash::sig_identify_collection()")
 
 
-  # Pick appropriate reference gene
+  # Pick appropriate reference genome
   if(ref == "hg19"){
     ref_genome <- "BSgenome.Hsapiens.UCSC.hg19"
   }else if (ref == "hg38"){
@@ -247,7 +265,10 @@ sig_analyse_mutations <- function(
     n = n_bootstraps,
     method = "QP",
     min_count = 1L,
-    p_val_thresholds = c(0.05),
+    p_val_thresholds = c(0.05), # This value does inform how sigminer 'p-values' in the `p_val.csv` file are computed,
+    # we actually don't use these p-values for any downstream filtering/calculation.
+    # Rather we use sigstats::sig_compute_experimental_p_value() based on min_contribution_threshold
+    # Which can be seen in the bootstrap_summary.csv
     use_parallel = cores,
     seed = 123456L,
     job_id = NULL,
@@ -405,11 +426,16 @@ sig_analyse_mutations <- function(
 
   # Functions to pluck different types
   bootstrap_pluck_expo <- function(fit){
+
+    # Pluck the summary so we can annotate signatures with their bootstrap-computed p-value
+    df_bootstrap_summary <- dplyr::select(.data = bootstrap_pluck_summary(fit), SampleID, Sig, experimental_pval)
+
     fit$expo |>
       dplyr::rename(SampleID = sample, Contribution = exposure, Sig=sig, Method = method, Type = type)  |>
       dplyr::filter(Type == "optimal") |>
+      dplyr::select(-Type, -Method) |>
       dplyr::mutate(ContributionRelative = Contribution / sum(Contribution, na.rm = TRUE), .by = c(SampleID, Type)) |>
-      #dplyr::mutate(IsOptimal = Type == "optimal") |>
+      dplyr::left_join(df_bootstrap_summary, by = c("SampleID", "Sig")) |>
       dplyr::relocate(.after = dplyr::everything(), c(Contribution, ContributionRelative))
   }
 
@@ -418,7 +444,6 @@ sig_analyse_mutations <- function(
       dplyr::rename(SampleID = sample, Contribution = exposure, Sig=sig, Method = method, Type = type)  |>
       dplyr::filter(Type != "optimal") |>
       dplyr::mutate(ContributionRelative = Contribution / sum(Contribution, na.rm = TRUE), .by = c(SampleID, Type)) |>
-      #dplyr::mutate(IsOptimal = Type == "optimal") |>
       dplyr::relocate(.after = dplyr::everything(), c(Contribution, ContributionRelative))
 
   }
@@ -427,7 +452,6 @@ sig_analyse_mutations <- function(
     df_error <- fit$error |>
       dplyr::rename(Errors = errors, SampleID = sample, Type = type, Method = method) |>
       dplyr::filter(Type == "optimal") |>
-      #dplyr::mutate(IsOptimal = Type == "optimal") |>
       dplyr::relocate(Method, SampleID, Type)
 
     df_cosine <- fit$cosine |>
