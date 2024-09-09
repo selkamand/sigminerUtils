@@ -111,6 +111,8 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results/COLO
 }
 
 delim_column_to_list <- function(char){
+  if(!any(grepl(pattern = "|", fixed = TRUE, x = char)))
+    return(as.numeric(char))
  strsplit(char, split = "|", fixed = TRUE) |>
     lapply(as.numeric)
 }
