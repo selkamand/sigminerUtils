@@ -62,9 +62,8 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results/COLO
 
 
 
-    # valid_sigs <- df_bootstrap_summary |>
-    #   subset(experimental_pval < sparsity_pvalue, select=Sig, drop = TRUE)
-    valid_sigs <- with(df_bootstrap_summary, Sig[experimental_pval < sparsity_pvalue]) # switched to with version to avoid RCMD  check note
+    valid_sigs <- df_bootstrap_summary |>
+      subset(experimental_pval < sparsity_pvalue, select=Sig, drop = TRUE)
 
     model <- sigminerUtils_expo_to_model(df_exposures, valid_sigs)
 
