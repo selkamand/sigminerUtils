@@ -8,3 +8,6 @@ signatures
 colo829_signature_results
 reference/
 sigminerUtils/inst/reference/
+^\.github$
+^codecov\.yml$
+^pcawg$

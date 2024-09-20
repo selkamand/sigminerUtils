@@ -6,7 +6,6 @@
 #' @return A list with all the information required to build a signature report
 #' @export
 #'
-#' @examples
 sigminer2sigstory <- function(signature_folder = "colo829_signature_results/COLO829v003T", rds_outfile = "result_tree.rds", sparsity_pvalue = 0.05){
   assertions::assert_directory_exists(signature_folder)
   df_files = parse_sigminer_utils_outputs(signature_folder)
@@ -45,13 +44,16 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results/COLO
     tally = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "tally", .drop = FALSE][1,])
     expo = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "expo", .drop = FALSE][1,])
     bootstrap_summary = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "bootstrap_summary", .drop = FALSE][1,])
+    bootstraps = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "expo_bootstraps", .drop = FALSE][1,])
 
     assertions::assert(length(tally) > 0, msg = "Failed to find tally file for sigclass [{sigclass}] (sample: {sample})")
     assertions::assert(length(expo) > 0, msg = "Failed to find expo file for sigclass [{sigclass}] (sample: {sample})")
     assertions::assert(length(bootstrap_summary) > 0, msg = "Failed to find bootstrap_summary file for sigclass [{sigclass}] (sample: {sample})")
+    assertions::assert(length(bootstraps) > 0, msg = "Failed to find expo_bootstraps file for sigclass [{sigclass}] (sample: {sample})")
 
     df_tally <- read_tally(tally$filepath, convert_channels_to_cosmic = TRUE)
     df_exposures <- read_expo(expo$filepath)
+    df_bootstraps <- read_bootstraps(bootstraps$filepath)
     df_bootstrap_summary <- read_bootstrap_summary(bootstrap_summary$filepath)
 
 
@@ -82,10 +84,26 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results/COLO
     )
 
     # Bootstraps
-    gg_signature_stability <- plot_boxplot_stats(
-      stats = df_bootstrap_summary, col_x = "Sig", p_threshold = sparsity_pvalue, min_contribution_threshold = ls_thresholds$sparsity_filter_threshold, interactive = FALSE
+    # Convert df_bootstraps to sigverse bootstrap format
+    df_bootstraps <- sigshared::bselect(
+      df_bootstraps,
+      c(
+        signature = "Sig",
+        bootstrap = "Type",
+        contribution_absolute = "Contribution",
+        contribution = "ContributionRelative"
       )
+    )
+    # Plot bootstraps
+    gg_signature_stability <- sigvis::sig_visualise_bootstraps(
+      bootstraps = df_bootstraps,
+      min_contribution_threshold = ls_thresholds$min_contribution_threshold,
+      pvalue = sparsity_pvalue,
+      horizontal = TRUE
+    )
 
+    # Plot Dotplot
+    browser()
     # Add Results to Tree
     result_tree[[sigclass]] <- list(
       collection_name = collection_name,
@@ -96,13 +114,14 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results/COLO
       total_mutations = total_mutations,
       proportion_of_unexplained_mutations = unexplained_mutations/total_mutations,
       cosine_reconstructed_vs_observed = cosine_reconstructed_vs_tally,
+      df_bootstraps = df_bootstraps,
       df_bootstrap_summary = df_bootstrap_summary,
       gg_reconstructed_vs_observed = gg_reconstructed_vs_observed,
       gg_signature_stability = gg_signature_stability,
       fitting_method = "Sigminer QP"
     )
 
-    #browser()
+
   }
 
   #browser()
@@ -118,71 +137,6 @@ delim_column_to_list <- function(char){
 }
 
 
-plot_boxplot_stats <- function(stats, col_x = "id", xlab = "ID", ylab = "Value", p_threshold, min_contribution_threshold, interactive=TRUE){
-  requireNamespace("ggplot2", quietly = TRUE)
-
-    stats[[1]] <- forcats::fct_rev(forcats::fct_reorder(stats[[1]], stats$median))
-    stats$outliers_listcol <- delim_column_to_list(stats$outliers)
-    df_outliers <- boxplotstats::unnest(stats[[col_x]], stats$outliers_listcol)
-    df_outliers
-
-    ylab="Fraction"
-
-    df_pass <- stats |>
-      subset(experimental_pval < p_threshold)
-    ids_to_colour <-  df_pass[[col_x]]
-
-    gg <- ggplot2::ggplot(stats) +
-      ggiraph::geom_boxplot_interactive(
-        ggplot2::aes(
-          x = .data[[col_x]],
-          ymin = .data[["outlier_low_threshold"]],
-          ymax = .data[["outlier_high_threshold"]],
-          middle = .data[["median"]],
-          lower = .data[["q1"]],
-          upper = .data[["q3"]],
-          fill = .data[[col_x]] %in% ids_to_colour,
-          color = .data[[col_x]] %in% ids_to_colour,
-          #data_id = .data[[col_x]],
-          tooltip = paste0(
-            .data[[col_x]], "<br/>",
-            "median: ", round(.data[["median"]], digits = 2),"<br/>",
-            "p-value: ", round(.data[["experimental_pval"]], digits = 5)
-          ),
-        ),
-        show.legend = FALSE,
-        staplewidth=0.5,
-        width = 0.5,
-        stat = "identity") +
-      ggplot2::geom_point(
-        data = df_outliers,
-        ggplot2::aes(
-          x=.data[['id']],
-          y=.data[["values"]],
-          fill = .data[['id']] %in% ids_to_colour,
-          color = .data[['id']] %in% ids_to_colour
-        ),
-        show.legend = FALSE
-      ) +
-      ggplot2::ggtitle(paste0("Signature stability across ", nrow(stats), " bootstraps")) +
-      ggplot2::geom_hline(yintercept = p_threshold, linetype = "dashed", color = "#D3494D") +
-      ggplot2::coord_cartesian(ylim = c(0, NA)) +
-      ggplot2::scale_fill_manual(values = c("TRUE" = "#AFE1AF", "FALSE" = "#BEBEBE")) +
-      ggplot2::scale_color_manual(values = c("TRUE" = "#077969", "FALSE" = "#A9A9A9")) +
-      ggplot2::scale_y_continuous(expand = ggplot2::expansion(c(0, 0.1)), labels = scales::label_percent()) +
-      ggplot2::xlab(NULL) +
-      ggplot2::ylab(ylab) +
-      ggplot2::theme_bw() +
-      ggplot2::theme(
-        axis.text.x = ggplot2::element_text(angle = 90, v = 0.5),
-        panel.grid.major.y = ggplot2::element_blank()
-        )
-
-
-    if(interactive) gg <- ggiraph::girafe(ggobj=gg, width_svg = 8, height_svg = 4.5)
-
-    return(gg)
-}
 
 sigminerUtils_expo_to_model <- function(df, signatures){
   df <- subset(df, Sig %in% signatures)
@@ -205,6 +159,13 @@ read_sig_collection_names <- function(filepath){
   return(l)
 }
 read_bootstrap_summary <- function(filepath){
+  assertions::assert_file_exists(filepath)
+  df <- read.csv(filepath, header = TRUE)
+  df <- tibble::as_tibble(df)
+  return(df)
+}
+
+read_bootstraps <- function(filepath){
   assertions::assert_file_exists(filepath)
   df <- read.csv(filepath, header = TRUE)
   df <- tibble::as_tibble(df)

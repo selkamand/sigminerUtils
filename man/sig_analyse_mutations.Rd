@@ -19,6 +19,7 @@ sig_analyse_mutations(
   db_cn_name = NULL,
   db_sv_name = NULL,
   ref_tallies = NULL,
+  min_contribution_threshold = 0.05,
   ref = c("hg38", "hg19"),
   output_dir = "./signatures",
   exposure_type = c("absolute", "relative"),
@@ -43,6 +44,8 @@ Alternatively, you can supply a path to signature collections in tidy_csv format
 \item{ref_tallies}{path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using \code{\link[=sig_create_reference_set]{sig_create_reference_set()}}.
 If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.}
 
+\item{min_contribution_threshold}{The minimum contribution threshold a signature must surpass for it to count as 'present' in a bootstrap (typically 0.05). This is sometimes referred to as the sparsity threshold. See \code{\link[sigstats:sig_compute_experimental_p_value]{sigstats::sig_compute_experimental_p_value()}} for details.}
+
 \item{ref}{A character vector specifying the reference genome. One of 'hg38' or 'hg19'.}
 
 \item{output_dir}{The output directory for storing results. Default is "./signatures".}
@@ -59,5 +62,23 @@ If building yourself, it must contain columns class,sample,channel,type,fraction
 None.
 }
 \description{
-Run all signature mutation analyses possible from MAF inputs on
+Screen datasets for known mutational signatures by
+supplying both sample mutation data and collections of known
+signatures.
+}
+\details{
+Produces the following files:
+
+Per Run:
+signature_collections.csv: Describes the signature collection used COSMIC_v3.4_SBS_GRCh38
+thresholds.csv: Describes any the thresholds that were used
+
+For each signature class:
+\if{html}{\out{<signatureclass>}}_catalogue.\if{html}{\out{<sampleid>}}.\if{html}{\out{<refgenome>}}.tally.csv.gz: A tally of mutations in the sample by channel.
+\if{html}{\out{<signatureclass>}}_fit.\if{html}{\out{<sampleid>}}.\if{html}{\out{<refgenome>}}.expo.csv.gz: The signature model produced by sigminer (\% contribution of each signature). Annotated with p-val from bootstrap_summary.csv.gz
+\if{html}{\out{<signatureclass>}}_fit.\if{html}{\out{<sampleid>}}.\if{html}{\out{<refgenome>}}.bootstrap_summary.csv.gz: A signature-level summary of stability across bootstraps. Includes experimentally defined P-values.
+\if{html}{\out{<signatureclass>}}_fit.\if{html}{\out{<sampleid>}}.\if{html}{\out{<refgenome>}}.expo_bootstraps.csv.gz: The optimal signature model produced in each bootstrap.
+\if{html}{\out{<signatureclass>}}_fit.\if{html}{\out{<sampleid>}}.\if{html}{\out{<refgenome>}}.error_and_cosine.csv.gz: Error and cosine similarity of signature model VS original data (unfiltered model, so may include unstable signatures)
+\if{html}{\out{<signatureclass>}}_fit.\if{html}{\out{<sampleid>}}.\if{html}{\out{<refgenome>}}.error_and_cosine_bootstraps.csv.gz: Error and cosine similarity of each bootstraps optimal signature model vs original data (unfiltered model, so may include unstable signatures).
+\if{html}{\out{<signatureclass>}}_fit.\if{html}{\out{<sampleid>}}.\if{html}{\out{<refgenome>}}.p_val.csv.gz: Per-signature p value computed by sigminer. Note this is different to the p-value in bootstrap_summary and expo datasets (we recommend using the latter, which has been added for greater consistency with other signature pipelines).
 }

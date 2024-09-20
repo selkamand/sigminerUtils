@@ -18,6 +18,8 @@ knitr::opts_chunk$set(
 <!-- badges: start -->
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 [![CRAN status](https://www.r-pkg.org/badges/version/sigminerUtils)](https://CRAN.R-project.org/package=sigminerUtils)
+[![Codecov test coverage](https://codecov.io/gh/selkamand/sigminerUtils/branch/master/graph/badge.svg)](https://app.codecov.io/gh/selkamand/sigminerUtils?branch=master)
+[![R-CMD-check](https://github.com/selkamand/sigminerUtils/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/selkamand/sigminerUtils/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 
@@ -121,8 +123,14 @@ sig_add_to_database('./signatures', './my_sig_database.sqlite', ref = "hg19", me
 ```
 
 
-
 ### Run in Single Sample Mode from Oncoanalyser outputs
+
+```{r include=FALSE}
+
+# Ensure folders we are going to create don't already exist
+unlink("pcawg_signature_results", recursive = TRUE)
+unlink("colo829_signature_results", recursive = TRUE)
+```
 
 ```{r, eval = FALSE}
 path_snvs <- system.file("colo829_testfiles/COLO829v003T.purple.somatic.vcf.gz", package = "sigminerUtils")
@@ -136,3 +144,26 @@ sig_analyse_mutations_single_sample_from_files(
   output_dir = "colo829_signature_results"
 )
 ```
+
+
+### Run in Cohort Mode using a manifest file
+
+Need to find a way to run this when manifest includes 
+
+```{r}
+# Extract PCAWG data into working directory
+pcawg_tar = system.file("pcawg/pcawg_data.tar.gz", package = "sigminerUtils")
+untar(tarfile = pcawg_tar, exdir = "pcawg")
+
+# Supply a manifest file
+path_manifest <- system.file("pcawg/manifest.tsv", package = "sigminerUtils")
+
+# Run the signature analysis
+sig_analyse_cohort_from_files(
+  manifest = path_manifest,
+  ref = "hg19",
+  output_dir = "pcawg_signature_results", 
+  cores=1
+)
+```
+

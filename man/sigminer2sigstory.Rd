@@ -6,7 +6,8 @@
 \usage{
 sigminer2sigstory(
   signature_folder = "colo829_signature_results/COLO829v003T",
-  p_threshold = 0.5
+  rds_outfile = "result_tree.rds",
+  sparsity_pvalue = 0.05
 )
 }
 \value{

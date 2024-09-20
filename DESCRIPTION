@@ -8,6 +8,7 @@ Description: A collection of utilities for running signature analysis with sigmi
     Results are stored in a sqlite database and indexed for downstream analysis.
 License: MIT + file LICENSE
 Suggests: 
+    spelling,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Encoding: UTF-8
@@ -36,10 +37,11 @@ Imports:
     tidyr,
     umap,
     utils
-Remotes:  
+Remotes: 
     selkamand/sigstash,
     selkamand/sigstats,
     selkamand/boxplotstats,
     selkamand/sigstart
 URL: https://github.com/selkamand/sigminerUtils
 BugReports: https://github.com/selkamand/sigminerUtils/issues
+Language: en-US

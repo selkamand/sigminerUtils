@@ -1,0 +1,6 @@
+sample	copynumber	snv
+DO1000	pcawg/singlesample/copynumber/DO1000.copynumber.tsv.bgz	pcawg/singlesample/snv/DO1000.snv_indel.vcf.bgz
+DO1001	pcawg/singlesample/copynumber/DO1001.copynumber.tsv.bgz	pcawg/singlesample/snv/DO1001.snv_indel.vcf.bgz
+DO1002	pcawg/singlesample/copynumber/DO1002.copynumber.tsv.bgz	pcawg/singlesample/snv/DO1002.snv_indel.vcf.bgz
+DO1003	pcawg/singlesample/copynumber/DO1003.copynumber.tsv.bgz	pcawg/singlesample/snv/DO1003.snv_indel.vcf.bgz
+DO1004	pcawg/singlesample/copynumber/DO1004.copynumber.tsv.bgz	pcawg/singlesample/snv/DO1004.snv_indel.vcf.bgz

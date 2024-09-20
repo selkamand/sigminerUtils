@@ -494,7 +494,6 @@ sig_analyse_mutations <- function(
         experimental_pval = sigstats::sig_compute_experimental_p_value(ContributionRelative, threshold = min_contribution_threshold),
         .by = c(SampleID, Sig)
         )
-    df_summary
     return(df_summary)
   }
 
@@ -552,6 +551,10 @@ sort_so_rownames_match <- function(data, rowname_desired_order){
   return(data[indexes,])
 }
 
+
+# Wrappers ----------------------------------------------------------------
+
+
 #' Mutational Signature Analysis
 #'
 #' Run all signature mutation analyses possible from file inputs.
@@ -561,7 +564,7 @@ sort_so_rownames_match <- function(data, rowname_desired_order){
 #' @inheritParams sigstart::parse_purple_sv_vcf_to_sigminer
 #' @inheritParams sigstart::parse_vcf_to_sigminer_maf
 #' @param sample_id string representing the tumour sample identifier (in your VCFs and other files).
-#' @return None.
+#' @return TRUE if analysis finished successfully and FALSE if it FAILED
 #' @export
 #'
 #' @examples
@@ -584,7 +587,7 @@ sort_so_rownames_match <- function(data, rowname_desired_order){
 #'   vcf_snv = path_snvs,
 #'   segment = path_cnvs,
 #'   vcf_sv = path_svs,
-#'   pass_only = TRUE,
+#'   include = "pass",
 #'   ref = "hg38",
 #'   output_dir = "colo829_signature_results"
 #' )
@@ -594,7 +597,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
     vcf_snv = NULL,
     segment = NULL,
     vcf_sv = NULL,
-    pass_only = TRUE,
+    include = "pass",
     exclude_sex_chromosomes = TRUE,
     allow_multisample = TRUE,
     db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
@@ -629,9 +632,9 @@ sig_analyse_mutations_single_sample_from_files <- function(
 
 
     # Parse the variant files into sigminer-compatible formats
-    small_variants <- if(!is.null(vcf_snv)) sigstart::parse_vcf_to_sigminer_maf(vcf_snv = vcf_snv, sample_id = sample_id, pass_only = pass_only, allow_multisample = allow_multisample) else NULL
+    small_variants <- if(!is.null(vcf_snv)) sigstart::parse_vcf_to_sigminer_maf(vcf_snv = vcf_snv, sample_id = sample_id, include = include, allow_multisample = allow_multisample) else NULL
     cnvs <- if(!is.null(segment)) sigstart::parse_purple_cnv_to_sigminer(segment = segment, sample_id = sample_id, exclude_sex_chromosomes = exclude_sex_chromosomes) else NULL
-    svs <- if(!is.null(vcf_sv)) sigstart::parse_purple_sv_vcf_to_sigminer(vcf_sv = vcf_sv, sample_id = sample_id, pass_only = pass_only) else NULL
+    svs <- if(!is.null(vcf_sv)) sigstart::parse_purple_sv_vcf_to_sigminer(vcf_sv = vcf_sv, sample_id = sample_id, include = include) else NULL
 
 
     # Create a log with just the most important info about each run
@@ -650,10 +653,6 @@ sig_analyse_mutations_single_sample_from_files <- function(
     # Create an additional logfile for sigminerUtils output
     sigminer_log <- glue::glue_safe("{sample_dir}/{sample_id}.sigminer.log")
     file.create(sigminer_log)
-
-    # Sink all sigminer messages to sigminer.log
-    # zz <- file(sigminer_log, open = "wt")
-    # sink(type = "message", file = zz, split = TRUE)
 
 
     cli::cli_h2("Running Signature Analysis. This will take some time")
@@ -687,5 +686,170 @@ sig_analyse_mutations_single_sample_from_files <- function(
     else{
       cli::cli_progress_step("Finished successfully")
       write("\n\nFinished successfully!", sample_log, append = TRUE)
+      return(TRUE)
     }
+
+    return(FALSE)
+}
+
+#' Signature analysis on a large cohorts
+#'
+#' @param manifest a file with the following column names.
+#' 1. \strong{sample} (required) sample identifier
+#' 2. \strong{snv} (optional) path to vcf file with SNVs, MNVs, and INDELs.
+#' 3. \strong{copynumber} (optional) path to segment file describing copynumber changes. Must be parse-able by [sigstart::parse_cnv_to_sigminer()].
+#' 4. \strong{sv} (optional) path to segment file describing structural variant changes. Must be parse-able by [sigstart::parse_purple_sv_vcf_to_sigminer()].
+#'
+#' @inheritParams sig_analyse_mutations_single_sample_from_files
+#' @param cores number of threads to split signature analysis across (distributed by sample).
+#' @return None.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' path_manifest <- system.file(
+#'   "pcawg/example_manifest.tsv",
+#'   package = "sigminerUtils"
+#' )
+#'
+#' sig_analyse_mutations_single_sample_from_files(
+#'   manifest =
+#'   include = "pass",
+#'   ref = "hg19",
+#'   output_dir = "pcawg_signature_results"
+#' )
+#' }
+sig_analyse_cohort_from_files <- function(manifest,
+                                          exclude_sex_chromosomes = TRUE,
+                                          allow_multisample = TRUE,
+                                          include = "pass",
+                                          db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
+                                          ref_tallies = NULL,
+                                          ref = c('hg38', 'hg19'),
+                                          output_dir = "./signatures",
+                                          exposure_type = c("absolute", "relative"),
+                                          n_bootstraps = 100,
+                                          temp_dir = tempdir(),
+                                          cores = future::availableCores(omit = 2)
+                                          ){
+
+
+  # Parse manifest
+  ls_manifest <- parse_manifest(manifest)
+  samples <- names(ls_manifest)
+  nsamples <- length(samples)
+
+  # Create Output Directory
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE, showWarnings = TRUE)
+  }
+
+  # Run Signature analysis for each sample (in parallel, forked with 1 core per sample)
+  cohort_analysis_log <- glue::glue_safe("{output_dir}/cohort.analysis.log")
+  file.create(cohort_analysis_log)
+
+  cli::cli_alert_info("Running signature analysis for [{nsamples}] samples. This may take a while ...")
+  start.time <- Sys.time()
+
+  successful <- parallel::mclapply(
+    X = names(ls_manifest),
+    FUN = function(sample){
+      ls_filepaths = ls_manifest[[sample]]
+      res <- try({
+        sig_analyse_mutations_single_sample_from_files(
+        sample_id = sample,
+        vcf_snv = ls_filepaths$snv,
+        segment = ls_filepaths$copynumber,
+        vcf_sv = ls_filepaths$sv,
+        exclude_sex_chromosomes = exclude_sex_chromosomes,
+        allow_multisample = allow_multisample,
+        db_sbs = db_sbs,
+        db_indel = db_indel,
+        db_dbs = db_dbs,
+        db_cn = db_cn,
+        db_sv = db_sv,
+        ref_tallies = ref_tallies,
+        ref = ref,
+        output_dir = output_dir,
+        exposure_type = exposure_type,
+        n_bootstraps = n_bootstraps,
+        temp_dir = temp_dir,
+        cores = 1, # We do the actual signature analysis single threaded so we can run different samples in parallel
+      )
+      })
+
+      # Have to write output in oneline since this could run in parallel
+      write(paste0("----------", sample, "----------\n", res), file = cohort_analysis_log, append = TRUE)
+      if("try-error" %in% class(res)){
+       res <- FALSE
+      }
+      return(res)
+    }, mc.cores = min(cores, nsamples)
+  )
+
+  # Output time taken
+  end.time <- Sys.time()
+  time.taken <- round(end.time - start.time,2)
+  cli::cli_alert_info("Cohort analysis completed in {time.taken} seconds")
+
+  # Check how many were successful
+  succeeded <- unlist(successful)
+  total_succeeded <- sum(succeeded)
+  total_failed <- sum(!succeeded)
+  total <- length(succeeded)
+
+  if(total_succeeded != total){
+    cli::cli_alert_warning("Analysis of {total_failed}/{total} samples failed. See {.path {cohort_analysis_log}} for details")
+  }
+  else
+    cli::cli_alert_success("Analysis of all {total} samples was successful")
+
+  return(invisible(NULL))
+}
+
+parse_manifest <- function(manifest, sep = "\t", check_files_exist=TRUE, as_list = TRUE){
+  df_manifest <- utils::read.csv(manifest, sep = sep, header = TRUE)
+
+  # Assert not empty
+  assertions::assert(nrow(df_manifest) > 0, msg = "manifest file is empty [{.path {manifest}]")
+
+  # Assert expected columns
+  col_sample = "sample"
+  cols_filepaths = c("snv", "copynumber", "sv")
+  valid_columns <- c(col_sample, cols_filepaths)
+
+  observed_columns <- colnames(df_manifest)
+  missing_cols <- setdiff(valid_columns, observed_columns)
+  found_cols <- intersect(observed_columns, valid_columns)
+  found_filepath_cols <- intersect(observed_columns, cols_filepaths)
+
+  if(length(missing_cols) > 0){
+    assertions::assert(! col_sample %in% missing_cols, msg = "manifest file is missing the requird column: {.strong sample}")
+    assertions::assert(
+      any(cols_filepaths %in% found_cols), msg = "manifest file must include at least one of the following columns: {.strong {cols_filepaths}}"
+      )
+  }
+
+  # Alert success
+  cli::cli_alert_success("Found required columns in manifest: [{.strong {found_cols}}]")
+
+  # Assert no duplicate sample ids
+  assertions::assert_no_duplicates(df_manifest[[col_sample]])
+
+  # Assert all files exist
+  if(check_files_exist){
+    for (col in found_filepath_cols) {
+      for (filepath in stats::na.omit(df_manifest[[col]])){
+        assertions::assert_file_exists(filepath)
+      }
+    }
+  }
+
+  if(!as_list){
+    return(df_manifest)
+  }
+
+  ls_manifest <- lapply(split(df_manifest, f = df_manifest$sample), as.list)
+
+  return(ls_manifest)
 }
