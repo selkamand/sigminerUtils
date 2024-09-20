@@ -12,7 +12,7 @@ db_read_if_filepath <- function(db, dbtype = "A"){
   if(is.character(db) & length(db) == 1) {
     cli::cli_alert_info("{dbtype} signature collection was supplied as a string. Attempting to read as a file (assuming csv_tidy format)")
     signature_collection <- sigstash::sig_read_signatures(filepath = db, format = "csv_tidy")
-    sig_collection_to_sigminer(signature_collection)
+    sigstash::sig_collection_to_sigminer(signature_collection)
   }
   else
     return(db)

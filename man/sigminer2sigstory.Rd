@@ -10,6 +10,13 @@ sigminer2sigstory(
   sparsity_pvalue = 0.05
 )
 }
+\arguments{
+\item{signature_folder}{folder containing signature data}
+
+\item{rds_outfile}{file to store resulting sigstory-powering list as.}
+
+\item{sparsity_pvalue}{max p-value, below which we consider the signatures to be stable across bootstraps. See \code{\link[sigstats:sig_compute_experimental_p_value]{sigstats::sig_compute_experimental_p_value()}} for pvalue computation.}
+}
 \value{
 A list with all the information required to build a signature report
 }

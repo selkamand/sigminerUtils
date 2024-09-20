@@ -3,6 +3,10 @@
 #'
 #'  This function takes the outputs of sigminerUtils and parses them into sigstory ready visualisations & analysies
 #'
+#' @param signature_folder folder containing signature data
+#' @param rds_outfile file to store resulting sigstory-powering list as.
+#' @param sparsity_pvalue  max p-value, below which we consider the signatures to be stable across bootstraps. See [sigstats::sig_compute_experimental_p_value()] for pvalue computation.
+#'
 #' @return A list with all the information required to build a signature report
 #' @export
 #'
@@ -57,8 +61,10 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results/COLO
     df_bootstrap_summary <- read_bootstrap_summary(bootstrap_summary$filepath)
 
 
-    valid_sigs <- df_bootstrap_summary |>
-      subset(experimental_pval < sparsity_pvalue, select=Sig, drop = TRUE)
+
+    # valid_sigs <- df_bootstrap_summary |>
+    #   subset(experimental_pval < sparsity_pvalue, select=Sig, drop = TRUE)
+    valid_sigs <- with(df_bootstrap_summary, Sig[experimental_pval < sparsity_pvalue]) # switched to with version to avoid RCMD  check note
 
     model <- sigminerUtils_expo_to_model(df_exposures, valid_sigs)
 
@@ -293,6 +299,7 @@ filepaths_to_sample_id <- function(filepaths){
 #' # Returns: c("extension", "txt")
 #'
 #' @keywords internal
+#' @noRd
 extract_nth_component_from_filename <- function(filenames, n = 1, sep = ".", fixed = TRUE) {
 
   # Split each filename by the separator

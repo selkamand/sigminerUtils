@@ -11,3 +11,6 @@ sigminerUtils/inst/reference/
 ^\.github$
 ^codecov\.yml$
 ^pcawg$
+pcawg_signature_results
+colo829_signature_results
+COLO829v003T.purple.somatic.vcf.gz
