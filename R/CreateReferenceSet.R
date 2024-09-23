@@ -189,18 +189,18 @@ build_umap_reference_set <- function(df_catalogues, outfolder, umap_n_neighbours
     n_samples <- nrow(class_specific_table)
     class_specific_table_no_missing <- class_specific_table |>
       dplyr::filter(dplyr::if_all(dplyr::everything(), ~!is.na(.)))
-    n_samples_with_tallys_for_currrent_class <- nrow(class_specific_table_no_missing)
-    cli::cli_alert_info("{n_samples_with_tallys_for_currrent_class}/{n_samples} have had features extracted and counted as part of {curr_class} signature analysis. Umap will be built using only these {n_samples_with_tallys_for_currrent_class}")
+    n_samples_with_tallies_for_currrent_class <- nrow(class_specific_table_no_missing)
+    if(n_samples_with_tallies_for_currrent_class != n_samples) cli::cli_alert_info("{n_samples_with_tallies_for_currrent_class}/{n_samples} have had features extracted and counted as part of {curr_class} signature analysis. Umap will be built using only these {n_samples_with_tallies_for_currrent_class}")
 
     # Check umap_n_neighbours paramater is appropriate for this dataset
-    if(n_samples_with_tallys_for_currrent_class < umap_n_neighbours) {
-      cli::cli_abort("{.arg umap_n_neighbours} must be smaller than the number of samples in your dataset (<={n_samples_with_tallys_for_currrent_class})")
+    if(n_samples_with_tallies_for_currrent_class < umap_n_neighbours) {
+      cli::cli_abort("{.arg umap_n_neighbours} must be smaller than the number of samples in your dataset (<={n_samples_with_tallies_for_currrent_class})")
     }
 
     # Perform UMAP
     umap <- umap::umap(d = class_specific_table_no_missing, n_neighbors = umap_n_neighbours, method = "naive", preserve.seed = TRUE)
 
-    # Write to Umap to compressed Rds file (will be used in predictions)
+    # Write Umap to compressed Rds file (will be used in predictions)
     cli::cli_progress_step("Writing {curr_class} umap reference to {.file {outfile_umap}}")
     saveRDS(umap,compress = "bzip2", file = outfile_umap)
   }
@@ -214,17 +214,17 @@ build_umap_reference_set <- function(df_catalogues, outfolder, umap_n_neighbours
   n_samples <- nrow(df_umap_tbl)
   class_specific_table_no_missing <- df_umap_tbl |>
     dplyr::filter(dplyr::if_all(dplyr::everything(), ~!is.na(.)))
-  n_samples_with_tallys_for_currrent_class <- nrow(class_specific_table_no_missing)
-  cli::cli_alert_info("{n_samples_with_tallys_for_currrent_class}/{n_samples} have had features extracted and counted for All signature analyses. Umap will be built using only these {n_samples_with_tallys_for_currrent_class}")
+  n_samples_with_tallies_for_currrent_class <- nrow(class_specific_table_no_missing)
+  cli::cli_alert_info("{n_samples_with_tallies_for_currrent_class}/{n_samples} have had features extracted and counted for All signature analyses. Umap will be built using only these {n_samples_with_tallies_for_currrent_class}")
 
   # Check theres enough samples to perform at all
-  if(n_samples_with_tallys_for_currrent_class == 0){
+  if(n_samples_with_tallies_for_currrent_class == 0){
     cli::cli_abort("No samples have been analysed against {.strong all} of the following signature classes [{all_classes}]")
   }
 
   # Check umap_n_neighbours paramater is appropriate for this dataset
-  if(n_samples_with_tallys_for_currrent_class < umap_n_neighbours) {
-    cli::cli_abort("{.arg umap_n_neighbours} must be smaller than the number of samples in your dataset (<={n_samples_with_tallys_for_currrent_class})")
+  if(n_samples_with_tallies_for_currrent_class < umap_n_neighbours) {
+    cli::cli_abort("{.arg umap_n_neighbours} must be smaller than the number of samples in your dataset (<={n_samples_with_tallies_for_currrent_class})")
   }
 
   # Perform UMAP

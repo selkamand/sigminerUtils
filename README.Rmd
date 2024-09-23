@@ -130,6 +130,7 @@ sig_add_to_database('./signatures', './my_sig_database.sqlite', ref = "hg19", me
 # Ensure folders we are going to create don't already exist
 unlink("pcawg_signature_results", recursive = TRUE)
 unlink("colo829_signature_results", recursive = TRUE)
+unlink("pcawg_reference_set", recursive = TRUE)
 ```
 
 ```{r, eval = FALSE}
@@ -167,3 +168,22 @@ sig_analyse_cohort_from_files(
 )
 ```
 
+### Create a reference set
+
+Single sample mutational signature analyses are much more informative when you
+have a reference set of samples to compare against.
+
+A reference set allows a single sample analysis to include
+
+1. Similar sample analysis
+2. UMAPs
+3. 
+
+```{r}
+sig_create_reference_set(
+  "pcawg_signature_results", 
+  outfolder = "pcawg_reference_set", 
+  create_umaps = TRUE, 
+  umap_n_neighbours = 2
+)
+```
