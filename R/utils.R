@@ -32,6 +32,13 @@ capture_messages <- function(logfile, tee=TRUE, expr) {
   if(tee) cat(messages, sep = "\n")
 }
 
+silence_messages <- function(verbose, expr){
+  if(!verbose)
+    suppressMessages(expr)
+  else
+    expr
+}
+
 #' Write compressed CSV
 #'
 #' @inheritParams utils::write.csv

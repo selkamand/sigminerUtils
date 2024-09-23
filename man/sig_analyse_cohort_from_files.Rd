@@ -20,6 +20,7 @@ sig_analyse_cohort_from_files(
   exposure_type = c("absolute", "relative"),
   n_bootstraps = 100,
   temp_dir = tempdir(),
+  verbose = TRUE,
   cores = future::availableCores(omit = 2)
 )
 }
@@ -61,6 +62,8 @@ If building yourself, it must contain columns class,sample,channel,type,fraction
 \item{n_bootstraps}{The number of bootstrap iterations for fitting signatures. Default is 100.}
 
 \item{temp_dir}{The temporary directory for storing intermediate files. Default is tempdir().}
+
+\item{verbose}{verbose (flag)}
 
 \item{cores}{number of threads to split signature analysis across (distributed by sample).}
 }

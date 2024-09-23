@@ -45,84 +45,6 @@ Load required packages
 library(sigminerUtils)
 ```
 
-1. Start by creating a Signature database
-
-```{r, eval = FALSE}
-sig_create_database('./my_sig_database.sqlite', overwrite = TRUE)
-```
-
-
-2. Run Signature Analysis
-
-```{r, eval=FALSE}
-# Variant Files
-path_maf <-  system.file(package = "sigminerUtils", path = "test.maf") 
-path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
-path_sv <- system.file(package = "sigminerUtils", path = "test.sv.csv") 
-
-sig_analyse_mutations(
-  maf = path_maf, 
-  copynumber = read.csv(path_copynumber),
-  structuralvariant = read.csv(path_sv),
-  ref = "hg19", 
-  output_dir = "./signatures"
-  )
-```
-
-3. Create a reference matrix
-
-```{r, eval=FALSE}
-sig_create_reference_set(
-  path_to_signature_directory = "./signatures",
-  outfolder = "./reference"
-  )
-```
-
-
-
-4. Use reference matrix to rerun your signature analysis
-
-Using a reference matrix allows samples to be compared to a reference database
-
-```{r, eval=FALSE}
-# Variant Files
-path_maf <-  system.file(package = "sigminerUtils", path = "test.maf")
-path_copynumber <- system.file(package = "sigminerUtils", path = "test.copynumber.csv") 
-path_sv <- system.file(package = "sigminerUtils", path = "test.sv.csv") 
-
-# Database of reference of sample catalogues
-path_reference_tallies <- system.file(package = "sigminerUtils", path = "reference/refmatrix.tally.parquet")
-
-sig_analyse_mutations(
-  maf = path_maf, 
-  copynumber = read.csv(path_copynumber),
-  structuralvariant = read.csv(path_sv),
-  ref = "hg19", 
-  ref_tallies = path_reference_tallies,
-  output_dir = "./signatures"
-)
-
-```
-
-
-3. Load results from output folder into the database
-
-```{r, eval = FALSE}
-sig_add_to_database('./signatures', './my_sig_database.sqlite', ref = "hg19")
-```
-Note you can optionally supply sample metadata
-
-```{r, eval = FALSE}
-sample_metadata <- data.frame(
-  sampleId = c('TCGA-A2-A0T5-01', 'TCGA-CA-6717-01', 'TCGA-CF-A9FF-01'),
-  disease = c('Breast', 'Colorectal', 'Bladder'),
-  description = character(3)
-)
-
-sig_add_to_database('./signatures', './my_sig_database.sqlite', ref = "hg19", metadata = sample_metadata)
-```
-
-
 ### Run in Single Sample Mode from Oncoanalyser outputs
 
 ```{r include=FALSE}
@@ -149,7 +71,7 @@ sig_analyse_mutations_single_sample_from_files(
 
 ### Run in Cohort Mode using a manifest file
 
-Need to find a way to run this when manifest includes 
+Run on a cohort of samples using a manifest file (see `?sig_analyse_cohort_from_files()` for details on the expected manifest format)
 
 ```{r}
 # Extract PCAWG data into working directory
@@ -184,6 +106,7 @@ sig_create_reference_set(
   "pcawg_signature_results", 
   outfolder = "pcawg_reference_set", 
   create_umaps = TRUE, 
-  umap_n_neighbours = 2
+  umap_n_neighbours = 2,
+  verbose=FALSE
 )
 ```

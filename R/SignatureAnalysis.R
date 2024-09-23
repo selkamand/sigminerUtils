@@ -701,6 +701,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
 #'
 #' @inheritParams sig_analyse_mutations_single_sample_from_files
 #' @param cores number of threads to split signature analysis across (distributed by sample).
+#' @param verbose verbose (flag)
 #' @return None.
 #' @export
 #'
@@ -751,7 +752,7 @@ sig_analyse_cohort_from_files <- function(manifest,
   if(verbose) cli::cli_alert_info("Running signature analysis for [{nsamples}] samples. This may take a while ...")
   start.time <- Sys.time()
 
-    silence_messages(
+  silence_messages(
       verbose = verbose,
       expr = {
         successful <- parallel::mclapply(
@@ -859,9 +860,4 @@ parse_manifest <- function(manifest, sep = "\t", check_files_exist=TRUE, as_list
   return(ls_manifest)
 }
 
-silence_messages <- function(verbose, expr){
-  if(!verbose)
-    suppressMessages(expr)
-  else
-    expr
-}
+

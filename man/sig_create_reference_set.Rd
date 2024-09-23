@@ -9,7 +9,8 @@ sig_create_reference_set(
   outfolder = "reference",
   format = c("parquet", "csv.gz"),
   create_umaps = TRUE,
-  umap_n_neighbours = 15
+  umap_n_neighbours = 15,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -24,6 +25,8 @@ sig_create_reference_set(
 \item{umap_n_neighbours}{This parameter sets the balance between local and global structure in UMAP.
 The value determines the size of the local neighborhood UMAP which is used to learn the manifold structure of the data.
 Lower values focus on local details. higher values emphasise more global patterns. Must be less than the number of samples in your dataset.}
+
+\item{verbose}{verbose (flag)}
 }
 \value{
 this function is run for its side effects. Invisibly returns NULL.
