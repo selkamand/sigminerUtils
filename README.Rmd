@@ -26,10 +26,11 @@ knitr::opts_chunk$set(
 <!-- badges: end -->
 
 
+> [!WARNING]  
+> This package is in early development and not ready for use
+
+
 Utility package to simplify the process of running sigminer, storing signature results and producing key visualisations
-
-*Warning:* This package is in early development and not ready for use
-
 
 ## Installation
 
