@@ -174,6 +174,7 @@ build_catalogue_reference_set <- function(df_catalogues, outfile_tally, format, 
 
 build_umap_reference_set <- function(df_catalogues, outfolder, umap_n_neighbours, verbose=TRUE){
   v <- verbose
+
   # Lets turn each feature in our tally into a a column and each sample into a row (values are fraction) - then we can create
   # a UMAP (1 for each sigclass and 1 with all combined)
   if(v) cli::cli_progress_step("Building UMAPs from sample catalogues")
@@ -183,8 +184,10 @@ build_umap_reference_set <- function(df_catalogues, outfolder, umap_n_neighbours
 
   all_classes <- unique(df_catalogues$class)
   if(v) cli::cli_h2("UMAPs for each signature class")
+
+  # Loop through each class of signature, build a umap, and add to the list
+  ls_umaps <- list()
   for (curr_class in all_classes){
-    outfile_umap <- glue::glue_safe("{outfolder}/refmatrix.{curr_class}.umap.rds.bz2")
 
     if(v) cli::cli_progress_step("Bulding UMAP for class {curr_class}")
     class_specific_table <- df_umap_tbl |>
@@ -206,8 +209,8 @@ build_umap_reference_set <- function(df_catalogues, outfolder, umap_n_neighbours
     umap <- umap::umap(d = class_specific_table_no_missing, n_neighbors = umap_n_neighbours, method = "naive", preserve.seed = TRUE)
 
     # Write Umap to compressed Rds file (will be used in predictions)
-    if(v) cli::cli_progress_step("Writing {curr_class} umap reference to {.file {outfile_umap}}")
-    saveRDS(umap,compress = "bzip2", file = outfile_umap)
+    if(v) cli::cli_progress_step("Adding {curr_class} umap reference to list")
+    ls_umaps[[curr_class]] <- umap
   }
 
   if(v) cli::cli_h2("UMAP from all signature classes")
@@ -235,11 +238,13 @@ build_umap_reference_set <- function(df_catalogues, outfolder, umap_n_neighbours
   # Perform UMAP
   umap <- umap::umap(d = class_specific_table_no_missing, n_neighbors = umap_n_neighbours, method = "naive", preserve.seed = TRUE)
 
-  outfile_umap <- paste0(outfolder, "/refmatrix.panclass.umap.rds.bz2")
+  # Add to
+  ls_umaps[["all_classes"]] <- umap
 
-  # Write results
-  if(v) cli::cli_progress_step("Writing pan-class umap reference to {outfile_umap}")
-  saveRDS(umap,compress = "bzip2", file = outfile_umap)
+  # Write list of umaps to compressed Rds file (will be used in predictions)
+  outfile_umap <- paste0(outfolder, "/refmatrix.umaps.rds.bz2")
+  if(v) cli::cli_progress_step("Writing {curr_class} umap reference to {.file {outfile_umap}}")
+  saveRDS(ls_umaps, compress = "bzip2", file = outfile_umap)
 
   remove(umap)
 }
