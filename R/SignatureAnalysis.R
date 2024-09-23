@@ -53,7 +53,6 @@ sig_analyse_mutations <- function(
 
   # TODO: REMOVE locale setting once sigstash issue https://github.com/selkamand/sigstash/issues/43 is resolved
   Sys.setlocale("LC_COLLATE", "C")
-
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
   ref <- rlang::arg_match(ref)
@@ -730,12 +729,13 @@ sig_analyse_cohort_from_files <- function(manifest,
                                           exposure_type = c("absolute", "relative"),
                                           n_bootstraps = 100,
                                           temp_dir = tempdir(),
+                                          verbose = TRUE,
                                           cores = future::availableCores(omit = 2)
                                           ){
 
 
   # Parse manifest
-  ls_manifest <- parse_manifest(manifest)
+  ls_manifest <- parse_manifest(manifest, verbose=verbose)
   samples <- names(ls_manifest)
   nsamples <- length(samples)
 
@@ -748,49 +748,54 @@ sig_analyse_cohort_from_files <- function(manifest,
   cohort_analysis_log <- glue::glue_safe("{output_dir}/cohort.analysis.log")
   file.create(cohort_analysis_log)
 
-  cli::cli_alert_info("Running signature analysis for [{nsamples}] samples. This may take a while ...")
+  if(verbose) cli::cli_alert_info("Running signature analysis for [{nsamples}] samples. This may take a while ...")
   start.time <- Sys.time()
 
-  successful <- parallel::mclapply(
-    X = names(ls_manifest),
-    FUN = function(sample){
-      ls_filepaths = ls_manifest[[sample]]
-      res <- try({
-        sig_analyse_mutations_single_sample_from_files(
-        sample_id = sample,
-        vcf_snv = ls_filepaths$snv,
-        segment = ls_filepaths$copynumber,
-        vcf_sv = ls_filepaths$sv,
-        exclude_sex_chromosomes = exclude_sex_chromosomes,
-        allow_multisample = allow_multisample,
-        db_sbs = db_sbs,
-        db_indel = db_indel,
-        db_dbs = db_dbs,
-        db_cn = db_cn,
-        db_sv = db_sv,
-        ref_tallies = ref_tallies,
-        ref = ref,
-        output_dir = output_dir,
-        exposure_type = exposure_type,
-        n_bootstraps = n_bootstraps,
-        temp_dir = temp_dir,
-        cores = 1, # We do the actual signature analysis single threaded so we can run different samples in parallel
-      )
-      })
+    silence_messages(
+      verbose = verbose,
+      expr = {
+        successful <- parallel::mclapply(
+          X = names(ls_manifest),
+          FUN = function(sample){
+            ls_filepaths = ls_manifest[[sample]]
+            res <- try({
+              sig_analyse_mutations_single_sample_from_files(
+                sample_id = sample,
+                vcf_snv = ls_filepaths$snv,
+                segment = ls_filepaths$copynumber,
+                vcf_sv = ls_filepaths$sv,
+                exclude_sex_chromosomes = exclude_sex_chromosomes,
+                allow_multisample = allow_multisample,
+                db_sbs = db_sbs,
+                db_indel = db_indel,
+                db_dbs = db_dbs,
+                db_cn = db_cn,
+                db_sv = db_sv,
+                ref_tallies = ref_tallies,
+                ref = ref,
+                output_dir = output_dir,
+                exposure_type = exposure_type,
+                n_bootstraps = n_bootstraps,
+                temp_dir = temp_dir,
+                cores = 1, # We do the actual signature analysis single threaded so we can run different samples in parallel
+              )
+            })
+            #  Write output to log in one go since this could run in parallel
+            write(paste0("----------", sample, "----------\n", res), file = cohort_analysis_log, append = TRUE)
+            if("try-error" %in% class(res)){
+              res <- FALSE
+            }
+            return(res)
+          }, mc.cores = min(cores, nsamples)
+        )
+        }
+    )
 
-      # Have to write output in oneline since this could run in parallel
-      write(paste0("----------", sample, "----------\n", res), file = cohort_analysis_log, append = TRUE)
-      if("try-error" %in% class(res)){
-       res <- FALSE
-      }
-      return(res)
-    }, mc.cores = min(cores, nsamples)
-  )
 
   # Output time taken
   end.time <- Sys.time()
   time.taken <- round(end.time - start.time,2)
-  cli::cli_alert_info("Cohort analysis completed in {time.taken} seconds")
+  if(verbose) cli::cli_alert_info("Cohort analysis completed in {time.taken} seconds")
 
   # Check how many were successful
   succeeded <- unlist(successful)
@@ -802,12 +807,12 @@ sig_analyse_cohort_from_files <- function(manifest,
     cli::cli_alert_warning("Analysis of {total_failed}/{total} samples failed. See {.path {cohort_analysis_log}} for details")
   }
   else
-    cli::cli_alert_success("Analysis of all {total} samples was successful")
+    cli::cli_alert_success("Analysis of all {total} samples was successful. See {.path {output_dir}} for results.")
 
   return(invisible(NULL))
 }
 
-parse_manifest <- function(manifest, sep = "\t", check_files_exist=TRUE, as_list = TRUE){
+parse_manifest <- function(manifest, sep = "\t", check_files_exist=TRUE, as_list = TRUE, verbose = TRUE){
   df_manifest <- utils::read.csv(manifest, sep = sep, header = TRUE)
 
   # Assert not empty
@@ -831,7 +836,7 @@ parse_manifest <- function(manifest, sep = "\t", check_files_exist=TRUE, as_list
   }
 
   # Alert success
-  cli::cli_alert_success("Found required columns in manifest: [{.strong {found_cols}}]")
+  if(verbose) { cli::cli_alert_success("Found required columns in manifest: [{.strong {found_cols}}]")}
 
   # Assert no duplicate sample ids
   assertions::assert_no_duplicates(df_manifest[[col_sample]])
@@ -852,4 +857,11 @@ parse_manifest <- function(manifest, sep = "\t", check_files_exist=TRUE, as_list
   ls_manifest <- lapply(split(df_manifest, f = df_manifest$sample), as.list)
 
   return(ls_manifest)
+}
+
+silence_messages <- function(verbose, expr){
+  if(!verbose)
+    suppressMessages(expr)
+  else
+    expr
 }

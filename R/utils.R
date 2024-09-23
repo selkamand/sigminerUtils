@@ -26,10 +26,10 @@ vcf2versions <- function(path_to_vcf){
 }
 
 
-capture_messages <- function(logfile, expr) {
+capture_messages <- function(logfile, tee=TRUE, expr) {
   messages <- utils::capture.output(expr, type = "message")
   cat(messages, file = logfile, append = TRUE, sep = "\n")
-  cat(messages, sep = "\n")
+  if(tee) cat(messages, sep = "\n")
 }
 
 #' Write compressed CSV

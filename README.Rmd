@@ -140,7 +140,7 @@ path_svs <-  system.file("colo829_testfiles/COLO829v003T.purple.sv.vcf.gz", pack
 
 sig_analyse_mutations_single_sample_from_files(
   sample_id = "COLO829v003T", vcf_snv = path_snvs, segment = path_cnvs, vcf_sv = path_svs,
-  pass_only = TRUE,
+  include = "pass",
   ref = "hg38",
   output_dir = "colo829_signature_results"
 )
@@ -164,8 +164,9 @@ sig_analyse_cohort_from_files(
   manifest = path_manifest,
   ref = "hg19",
   output_dir = "pcawg_signature_results", 
-  cores=1
-)
+  cores=1, 
+  verbose=FALSE
+) 
 ```
 
 ### Create a reference set
@@ -177,7 +178,6 @@ A reference set allows a single sample analysis to include
 
 1. Similar sample analysis
 2. UMAPs
-3. 
 
 ```{r}
 sig_create_reference_set(
