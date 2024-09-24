@@ -21,7 +21,7 @@
 #' @param db_sbs_name,db_indel_name,db_dbs_name,db_cn_name,db_sv_name names of signature databases (used for logs). If NULL, will try and lookup using [sigstash::sig_identify_collection()].
 #' @param ref_tallies path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using [sig_create_reference_set()].
 #' If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.
-#' @param ref_umaps path to an Rds file representing a serialised list of umap objects for different collection types. Produced by [sig_create_reference_set()].
+#' @param ref_umaps_prefix prefix of Rds file representing a serialised list of umap objects for different collection types. Produced by [sig_create_reference_set()].
 #' @param cores Number of cores to use.
 #' @param seed used for umap projection
 #' @return None.
@@ -49,7 +49,7 @@ sig_analyse_mutations <- function(
     db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
     db_sbs_name = NULL, db_indel_name = NULL, db_dbs_name = NULL, db_cn_name = NULL, db_sv_name = NULL,
     ref_tallies = NULL,
-    ref_umaps = NULL,
+    ref_umaps_prefix = NULL,
     seed = 111,
     min_contribution_threshold = 0.05,
     ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"),
@@ -67,10 +67,6 @@ sig_analyse_mutations <- function(
   if(!is.null(copynumber)) { assertions::assert_dataframe(copynumber); cn=TRUE} else cn = FALSE
   if(!is.null(structuralvariant)) { assertions::assert_dataframe(structuralvariant); sv = TRUE} else sv = FALSE
   if(!is.null(ref_tallies)) { assertions::assert_directory_exists(ref_tallies)}
-  if(!is.null(ref_umaps)) {
-    assertions::assert_file_exists(ref_umaps)
-    ref_umaps <- readRDS(ref_umaps)
-  }
 
   # Define default signature collections based on reference genome
   if(ref == "hg38"){
@@ -409,15 +405,54 @@ sig_analyse_mutations <- function(
       }
 
       # Project to existing UMAP
-      umap_currentclass <- ref_umaps[[class]]
-      if(!is.null(umap_currentclass)){
-        # Get the columns we need to feed to umap
-        # expected_cols <- colnames(umap_currentclass$data)
-
-        df_tally_wide=catalogue_to_wide(df_tally, class=class)
-        coords <- uwot::umap_transform(df_tally_wide, model=umap_currentclass, seed = seed, batch = TRUE)
+      if(is.null(ref_umaps_prefix)){
+        cli::cli_alert_info("Skipping projection onto {class} reference umaps because {.arg ref_umaps_prefix} argument was not supplied")
+        next
+      }
+      path_umap = paste0(ref_umaps_prefix, '.', class)
+      if(!file.exists(path_umap)){
+        cli::cli_alert_info("Skipping projection onto {class} reference umap since could not find file {path_umap}")
+        next
       }
 
+      # Read the umap reference
+      umap_model <- uwot::load_uwot(path_umap)
+
+      # Convert catalogue to the right form
+      df_tally_wide <- catalogue_to_wide(df_tally, class=class)
+
+      # Check column order matches expected from umap
+      assertions::assert_identical(
+        colnames(df_tally_wide), umap_model$column_order,
+        msg = "Failed to project {class} features onto umap for sample {sample} because channel order
+        does not match what was used build the original UMAP"
+      )
+
+      # Project onto existing umap
+      coords <- uwot::umap_transform(df_tally_wide, model=umap_model, seed = seed, batch = TRUE)
+
+      # Prepare ref matrix dataframe
+      df_coords_refmatrix <- as.data.frame(umap_model$embedding)
+      df_coords_refmatrix[["sample"]] <- rownames(df_coords_refmatrix)
+      df_coords_refmatrix <- df_coords_refmatrix[!df_coords_refmatrix$sample %in% sample,]
+      rownames(df_coords_refmatrix) <- NULL
+
+      # Prepare UMAP coordinate data.frame for sample of interest
+      df_coords_sample <- as.data.frame(coords)
+      df_coords_sample[["sample"]] <- sample
+
+      # Combine the two
+      df_coords <- rbind(df_coords_sample, df_coords_refmatrix)
+      colnames(df_coords) <- c("dim1" , "dim2", "sample")
+
+      # Add sample metadata
+      # TODO: add sample_metadata arg (first add to reference matrix creation function)
+
+      # Write the resulting UMAP dataset
+      path_umap_output <- glue::glue("{output_dir}/{class}_umap.{sample}.{ref}.umap.csv.gz")
+      write_compressed_csv(x = df_coords, file = path_umap_output)
+
+      cli::cli_alert_success("UMAP written to csv : {.path {path_umap_output}.gz}")
     }
   }
 
@@ -585,7 +620,8 @@ sort_so_rownames_match <- function(data, rowname_desired_order){
 #' @inheritParams sigstart::parse_purple_sv_vcf_to_sigminer
 #' @inheritParams sigstart::parse_vcf_to_sigminer_maf
 #' @param sample_id string representing the tumour sample identifier (in your VCFs and other files).
-#' @return TRUE if analysis finished successfully and FALSE if it FAILED
+#' @param verbose verbosity (flag)
+#' @return Invisibly returns TRUE if analysis finished successfully and FALSE if it FAILED
 #' @export
 #'
 #' @examples
@@ -623,12 +659,13 @@ sig_analyse_mutations_single_sample_from_files <- function(
     allow_multisample = TRUE,
     db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
     ref_tallies = NULL,
-    ref_umaps = NULL,
+    ref_umaps_prefix = NULL,
     ref = c('hg38', 'hg19'),
     output_dir = "./signatures",
     exposure_type = c("absolute", "relative"),
     n_bootstraps = 100,
     temp_dir = tempdir(),
+    verbose = TRUE,
     cores = future::availableCores())
   {
 
@@ -649,7 +686,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
       error <- glue::glue_safe("Sample folder already exists. To overwrite please manually delete [{sample_dir}]")
       cli::cli_abort(error)
     }
-    cli::cli_progress_step("Creating Output Directory at {.file {sample_dir}}")
+    if(verbose) cli::cli_progress_step("Creating Output Directory at {.file {sample_dir}}")
     dir.create(sample_dir, recursive = TRUE, showWarnings = TRUE)
 
 
@@ -677,17 +714,17 @@ sig_analyse_mutations_single_sample_from_files <- function(
     file.create(sigminer_log)
 
 
-    cli::cli_h2("Running Signature Analysis. This will take some time")
+    if(verbose) cli::cli_h2("Running Signature Analysis. This will take some time")
 
     try_output <- try({ # Try so we can explicitly log failure
-      capture_messages(logfile = sigminer_log, expr = {
+      capture_messages(logfile = sigminer_log, tee = verbose, expr = {
           sig_analyse_mutations(
           maf = small_variants,
           copynumber = cnvs,
           structuralvariant = svs,
           db_sbs = db_sbs, db_indel = db_indel, db_dbs = db_dbs, db_cn = db_cn, db_sv = db_sv,
           ref_tallies=ref_tallies,
-          ref_umaps = ref_umaps,
+          ref_umaps_prefix = ref_umaps_prefix,
           ref = ref,
           output_dir = sample_dir,
           exposure_type = exposure_type,
@@ -709,10 +746,10 @@ sig_analyse_mutations_single_sample_from_files <- function(
     else{
       cli::cli_progress_step("Finished successfully")
       write("\n\nFinished successfully!", sample_log, append = TRUE)
-      return(TRUE)
+      return(invisible(TRUE))
     }
 
-    return(FALSE)
+    return(invisible(FALSE))
 }
 
 #' Signature analysis on a large cohorts
@@ -749,6 +786,7 @@ sig_analyse_cohort_from_files <- function(manifest,
                                           include = "pass",
                                           db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
                                           ref_tallies = NULL,
+                                          ref_umaps_prefix = NULL,
                                           ref = c('hg38', 'hg19'),
                                           output_dir = "./signatures",
                                           exposure_type = c("absolute", "relative"),
@@ -797,6 +835,7 @@ sig_analyse_cohort_from_files <- function(manifest,
                 db_cn = db_cn,
                 db_sv = db_sv,
                 ref_tallies = ref_tallies,
+                ref_umaps_prefix = ref_umaps_prefix,
                 ref = ref,
                 output_dir = output_dir,
                 exposure_type = exposure_type,

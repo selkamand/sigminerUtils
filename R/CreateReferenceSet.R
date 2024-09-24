@@ -35,6 +35,7 @@ sig_create_reference_set <- function(
   outfile_tally <- paste0(outfolder, "/refmatrix.tally.", format)
   outfile_exposures <- paste0(outfolder, "/refmatrix.exposures.", format)
   outfile_bootstraps <- paste0(outfolder, "/refmatrix.bootstraps.", format)
+  outfile_umaps <- paste0(outfolder, "/refmatrix.umaps")
 
   assertions::assert_file_does_not_exist(outfile_tally)
   assertions::assert_file_does_not_exist(outfile_exposures)
@@ -54,7 +55,7 @@ sig_create_reference_set <- function(
   # Create UMAP reference ---------------------------------------------------
   if(v) cli::cli_h1("UMAPs (from sample catalogues)")
   if (create_umaps){
-    build_umap_reference_set(df_catalogues, outfolder = outfolder, umap_n_neighbours = umap_n_neighbours, seed=seed, verbose=verbose)
+    build_umap_reference_set(df_catalogues, outfile_umap_prefix = outfile_umaps, umap_n_neighbours = umap_n_neighbours, seed=seed, verbose=verbose)
   }else
     cli::cli_alert_warning("Skipping UMAP creation since {.arg create_umaps = FALSE}")
 
@@ -67,8 +68,31 @@ sig_create_reference_set <- function(
   # ---- Bootstraps ---- #
   df_bootstraps <- get_boostrap_summary_dataframe(path_to_signature_directory)
   build_bootstrap_reference_set(df_bootstraps, outfile_bootstraps, format=format, verbose=verbose)
-  return(invisible(NULL))
 
+  # ---- Instructions: Using Outputs ---- #
+  if (v) {
+    cli::cli_h1("Usage Instructions")
+    cli::cli_text("")
+
+    cli::cli_alert_success(
+      "Reference files were all successfully created and can be used in {.code sig_analyse_mutations()} and related functions."
+    )
+    cli::cli_text("")
+
+    if (create_umaps) {
+      cli::cli_alert_info("Project a sample onto the reference umaps include the argument:")
+      cli::cli_text("")
+      cli::cli_code(glue::glue("ref_umap_prefix = '{outfile_umaps}'"))
+      cli::cli_text("")
+    }
+
+    cli::cli_alert_info("To compare a sample to this reference set include the argument:")
+    cli::cli_text("")
+    cli::cli_code(glue::glue("ref_tallies = '{outfile_tally}'"))
+    cli::cli_text("")
+  }
+
+  return(invisible(NULL))
 }
 
 
@@ -176,7 +200,7 @@ build_catalogue_reference_set <- function(df_catalogues, outfile_tally, format, 
   if(v) cli::cli_alert_success("Tally refmatrix succesfully created")
 }
 
-build_umap_reference_set <- function(df_catalogues, seed=111, outfolder, umap_n_neighbours, verbose=TRUE){
+build_umap_reference_set <- function(df_catalogues, seed=111, outfile_umap_prefix, umap_n_neighbours, verbose=TRUE){
   v <- verbose
 
   # Lets turn each feature in our tally into a a column and each sample into a row (values are fraction) - then we can create
@@ -187,7 +211,6 @@ build_umap_reference_set <- function(df_catalogues, seed=111, outfolder, umap_n_
     tibble::column_to_rownames(var = "sample")
 
   all_classes <- unique(df_catalogues$class)
-  if(v) cli::cli_h2("UMAPs for each signature class")
 
   # Loop through each class of signature, build a umap, and add to the list
   ls_umaps <- list()
@@ -212,6 +235,9 @@ build_umap_reference_set <- function(df_catalogues, seed=111, outfolder, umap_n_
 
     # Perform UMAP
     umap <- uwot::umap(class_specific_table_no_missing, n_neighbors = umap_n_neighbours, ret_model = TRUE, seed = seed, batch=TRUE)
+
+    # Add column order to model (so we can check it when projecting new data)
+    umap <- uwot_add_column_order(umap, colnames(class_specific_table_no_missing))
 
     # Write Umap to compressed Rds file (will be used in predictions)
     if(v) cli::cli_progress_step("Adding {curr_class} umap reference to list")
@@ -243,21 +269,30 @@ build_umap_reference_set <- function(df_catalogues, seed=111, outfolder, umap_n_
   # Perform UMAP
   umap <- uwot::umap(class_specific_table_no_missing, n_neighbors = umap_n_neighbours, ret_model = TRUE, seed = seed, batch=TRUE)
 
+  # Add column order (so we can check it when projecting new data)
+  umap <- uwot_add_column_order(umap, colnames(class_specific_table_no_missing))
+
   # Add to
   ls_umaps[["all_classes"]] <- umap
 
   # Serialise umaps (need to be loaded with uwot::load_uwot() for projecting new data)
-  outfile_umap_prefix <- paste0(outfolder, "/refmatrix.umaps")
-  if(v) cli::cli_progress_step("Writing {curr_class} umap reference to {.file {outfile_umap}}")
   lapply(names(ls_umaps), \(curr_class){
     curr_umap_outfile <- paste0(outfile_umap_prefix, ".", curr_class)
+    if(v) cli::cli_progress_step("Writing {curr_class} umap reference to {.file {curr_umap_outfile}}")
+
     uwot::save_uwot(
       model = ls_umaps[[curr_class]],
       file = curr_umap_outfile,
-      unload = TRUE
+      unload = TRUE # drop umap from memory since we won't use it again here
     )
     }
   )
+}
+
+# Add column order to a umap model object
+uwot_add_column_order <- function(umap, column_order){
+  umap$column_order <- column_order
+  return(umap)
 }
 
 build_exposures_reference_set <- function(df_exposures, outfile, format, verbose=TRUE){

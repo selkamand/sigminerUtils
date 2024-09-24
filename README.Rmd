@@ -131,12 +131,13 @@ path_svs <-  system.file("colo829_testfiles/COLO829v003T.purple.sv.vcf.gz", pack
 sig_analyse_mutations_single_sample_from_files(
   sample_id = "COLO829v003T", 
   vcf_snv = path_snvs, 
-  segment = path_cnvs, 
-  vcf_sv = path_svs, 
+  segment = path_cnvs,
+  vcf_sv = path_svs,
   ref_tallies = "pcawg_reference_set/refmatrix.tally.parquet",
-  ref_umaps = "pcawg_reference_set/refmatrix.umaps.rds.bz2",
+  ref_umaps_prefix = "pcawg_reference_set/refmatrix.umaps",
   include = "pass",
   ref = "hg38",
-  output_dir = "colo829_signature_results_with_refset"
+  output_dir = "colo829_signature_results_with_refset", 
+  verbose = FALSE
 )
 ```
