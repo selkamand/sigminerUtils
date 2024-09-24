@@ -21,7 +21,9 @@
 #' @param db_sbs_name,db_indel_name,db_dbs_name,db_cn_name,db_sv_name names of signature databases (used for logs). If NULL, will try and lookup using [sigstash::sig_identify_collection()].
 #' @param ref_tallies path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using [sig_create_reference_set()].
 #' If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.
+#' @param ref_umaps_prefix prefix of Rds file representing a serialised list of umap objects for different collection types. Produced by [sig_create_reference_set()].
 #' @param cores Number of cores to use.
+#' @param seed used for umap projection
 #' @return None.
 #' @export
 #' @importFrom rlang `%||%`
@@ -47,6 +49,8 @@ sig_analyse_mutations <- function(
     db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
     db_sbs_name = NULL, db_indel_name = NULL, db_dbs_name = NULL, db_cn_name = NULL, db_sv_name = NULL,
     ref_tallies = NULL,
+    ref_umaps_prefix = NULL,
+    seed = 111,
     min_contribution_threshold = 0.05,
     ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"),
     n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
@@ -56,11 +60,13 @@ sig_analyse_mutations <- function(
 
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
+  #browser()
+  # Assertions
   ref <- rlang::arg_match(ref)
   exposure_type <- rlang::arg_match(exposure_type)
   if(!is.null(copynumber)) { assertions::assert_dataframe(copynumber); cn=TRUE} else cn = FALSE
   if(!is.null(structuralvariant)) { assertions::assert_dataframe(structuralvariant); sv = TRUE} else sv = FALSE
-
+  if(!is.null(ref_tallies)) { assertions::assert_directory_exists(ref_tallies)}
 
   # Define default signature collections based on reference genome
   if(ref == "hg38"){
@@ -397,6 +403,57 @@ sig_analyse_mutations <- function(
         )
         cli::cli_alert_success("Similarities written to csv : {.path {tmp_tally_outfile}.gz}")
       }
+
+      # Project to existing UMAP
+      if(is.null(ref_umaps_prefix)){
+        cli::cli_alert_info("Skipping projection onto {class} reference umaps because {.arg ref_umaps_prefix} argument was not supplied")
+        next
+      }
+      path_umap = paste0(ref_umaps_prefix, '.', class)
+      if(!file.exists(path_umap)){
+        cli::cli_alert_info("Skipping projection onto {class} reference umap since could not find file {path_umap}")
+        next
+      }
+
+      # Read the umap reference
+      rlang::check_installed("uwot", reason = "Creating UMAPs requires the 'uwot' pacakge to be installed. Please run install.packages('uwot') and restart R.")
+      umap_model <- uwot::load_uwot(path_umap)
+
+      # Convert catalogue to the right form
+      df_tally_wide <- catalogue_to_wide(df_tally, class=class)
+
+      # Check column order matches expected from umap
+      assertions::assert_identical(
+        colnames(df_tally_wide), umap_model$column_order,
+        msg = "Failed to project {class} features onto umap for sample {sample} because channel order
+        does not match what was used build the original UMAP"
+      )
+
+      # Project onto existing umap
+      coords <- uwot::umap_transform(df_tally_wide, model=umap_model, seed = seed, batch = TRUE)
+
+      # Prepare ref matrix dataframe
+      df_coords_refmatrix <- as.data.frame(umap_model$embedding)
+      df_coords_refmatrix[["sample"]] <- rownames(df_coords_refmatrix)
+      df_coords_refmatrix <- df_coords_refmatrix[!df_coords_refmatrix$sample %in% sample,]
+      rownames(df_coords_refmatrix) <- NULL
+
+      # Prepare UMAP coordinate data.frame for sample of interest
+      df_coords_sample <- as.data.frame(coords)
+      df_coords_sample[["sample"]] <- sample
+
+      # Combine the two
+      df_coords <- rbind(df_coords_sample, df_coords_refmatrix)
+      colnames(df_coords) <- c("dim1" , "dim2", "sample")
+
+      # Add sample metadata
+      # TODO: add sample_metadata arg (first add to reference matrix creation function)
+
+      # Write the resulting UMAP dataset
+      path_umap_output <- glue::glue("{output_dir}/{class}_umap.{sample}.{ref}.umap.csv.gz")
+      write_compressed_csv(x = df_coords, file = path_umap_output)
+
+      cli::cli_alert_success("UMAP written to csv : {.path {path_umap_output}.gz}")
     }
   }
 
@@ -564,7 +621,8 @@ sort_so_rownames_match <- function(data, rowname_desired_order){
 #' @inheritParams sigstart::parse_purple_sv_vcf_to_sigminer
 #' @inheritParams sigstart::parse_vcf_to_sigminer_maf
 #' @param sample_id string representing the tumour sample identifier (in your VCFs and other files).
-#' @return TRUE if analysis finished successfully and FALSE if it FAILED
+#' @param verbose verbosity (flag)
+#' @return Invisibly returns TRUE if analysis finished successfully and FALSE if it FAILED
 #' @export
 #'
 #' @examples
@@ -602,11 +660,13 @@ sig_analyse_mutations_single_sample_from_files <- function(
     allow_multisample = TRUE,
     db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
     ref_tallies = NULL,
+    ref_umaps_prefix = NULL,
     ref = c('hg38', 'hg19'),
     output_dir = "./signatures",
     exposure_type = c("absolute", "relative"),
     n_bootstraps = 100,
     temp_dir = tempdir(),
+    verbose = TRUE,
     cores = future::availableCores())
   {
 
@@ -627,7 +687,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
       error <- glue::glue_safe("Sample folder already exists. To overwrite please manually delete [{sample_dir}]")
       cli::cli_abort(error)
     }
-    cli::cli_progress_step("Creating Output Directory at {.file {sample_dir}}")
+    if(verbose) cli::cli_progress_step("Creating Output Directory at {.file {sample_dir}}")
     dir.create(sample_dir, recursive = TRUE, showWarnings = TRUE)
 
 
@@ -655,16 +715,17 @@ sig_analyse_mutations_single_sample_from_files <- function(
     file.create(sigminer_log)
 
 
-    cli::cli_h2("Running Signature Analysis. This will take some time")
+    if(verbose) cli::cli_h2("Running Signature Analysis. This will take some time")
 
     try_output <- try({ # Try so we can explicitly log failure
-      capture_messages(logfile = sigminer_log, expr = {
+      capture_messages(logfile = sigminer_log, tee = verbose, expr = {
           sig_analyse_mutations(
           maf = small_variants,
           copynumber = cnvs,
           structuralvariant = svs,
           db_sbs = db_sbs, db_indel = db_indel, db_dbs = db_dbs, db_cn = db_cn, db_sv = db_sv,
           ref_tallies=ref_tallies,
+          ref_umaps_prefix = ref_umaps_prefix,
           ref = ref,
           output_dir = sample_dir,
           exposure_type = exposure_type,
@@ -686,10 +747,10 @@ sig_analyse_mutations_single_sample_from_files <- function(
     else{
       cli::cli_progress_step("Finished successfully")
       write("\n\nFinished successfully!", sample_log, append = TRUE)
-      return(TRUE)
+      return(invisible(TRUE))
     }
 
-    return(FALSE)
+    return(invisible(FALSE))
 }
 
 #' Signature analysis on a large cohorts
@@ -702,6 +763,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
 #'
 #' @inheritParams sig_analyse_mutations_single_sample_from_files
 #' @param cores number of threads to split signature analysis across (distributed by sample).
+#' @param verbose verbose (flag)
 #' @return None.
 #' @export
 #'
@@ -725,17 +787,19 @@ sig_analyse_cohort_from_files <- function(manifest,
                                           include = "pass",
                                           db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
                                           ref_tallies = NULL,
+                                          ref_umaps_prefix = NULL,
                                           ref = c('hg38', 'hg19'),
                                           output_dir = "./signatures",
                                           exposure_type = c("absolute", "relative"),
                                           n_bootstraps = 100,
                                           temp_dir = tempdir(),
+                                          verbose = TRUE,
                                           cores = future::availableCores(omit = 2)
                                           ){
 
 
   # Parse manifest
-  ls_manifest <- parse_manifest(manifest)
+  ls_manifest <- parse_manifest(manifest, verbose=verbose)
   samples <- names(ls_manifest)
   nsamples <- length(samples)
 
@@ -748,49 +812,55 @@ sig_analyse_cohort_from_files <- function(manifest,
   cohort_analysis_log <- glue::glue_safe("{output_dir}/cohort.analysis.log")
   file.create(cohort_analysis_log)
 
-  cli::cli_alert_info("Running signature analysis for [{nsamples}] samples. This may take a while ...")
+  if(verbose) cli::cli_alert_info("Running signature analysis for [{nsamples}] samples. This may take a while ...")
   start.time <- Sys.time()
 
-  successful <- parallel::mclapply(
-    X = names(ls_manifest),
-    FUN = function(sample){
-      ls_filepaths = ls_manifest[[sample]]
-      res <- try({
-        sig_analyse_mutations_single_sample_from_files(
-        sample_id = sample,
-        vcf_snv = ls_filepaths$snv,
-        segment = ls_filepaths$copynumber,
-        vcf_sv = ls_filepaths$sv,
-        exclude_sex_chromosomes = exclude_sex_chromosomes,
-        allow_multisample = allow_multisample,
-        db_sbs = db_sbs,
-        db_indel = db_indel,
-        db_dbs = db_dbs,
-        db_cn = db_cn,
-        db_sv = db_sv,
-        ref_tallies = ref_tallies,
-        ref = ref,
-        output_dir = output_dir,
-        exposure_type = exposure_type,
-        n_bootstraps = n_bootstraps,
-        temp_dir = temp_dir,
-        cores = 1, # We do the actual signature analysis single threaded so we can run different samples in parallel
-      )
-      })
+  silence_messages(
+      verbose = verbose,
+      expr = {
+        successful <- parallel::mclapply(
+          X = names(ls_manifest),
+          FUN = function(sample){
+            ls_filepaths = ls_manifest[[sample]]
+            res <- try({
+              sig_analyse_mutations_single_sample_from_files(
+                sample_id = sample,
+                vcf_snv = ls_filepaths$snv,
+                segment = ls_filepaths$copynumber,
+                vcf_sv = ls_filepaths$sv,
+                exclude_sex_chromosomes = exclude_sex_chromosomes,
+                allow_multisample = allow_multisample,
+                db_sbs = db_sbs,
+                db_indel = db_indel,
+                db_dbs = db_dbs,
+                db_cn = db_cn,
+                db_sv = db_sv,
+                ref_tallies = ref_tallies,
+                ref_umaps_prefix = ref_umaps_prefix,
+                ref = ref,
+                output_dir = output_dir,
+                exposure_type = exposure_type,
+                n_bootstraps = n_bootstraps,
+                temp_dir = temp_dir,
+                cores = 1, # We do the actual signature analysis single threaded so we can run different samples in parallel
+              )
+            })
+            #  Write output to log in one go since this could run in parallel
+            write(paste0("----------", sample, "----------\n", res), file = cohort_analysis_log, append = TRUE)
+            if("try-error" %in% class(res)){
+              res <- FALSE
+            }
+            return(res)
+          }, mc.cores = min(cores, nsamples)
+        )
+        }
+    )
 
-      # Have to write output in oneline since this could run in parallel
-      write(paste0("----------", sample, "----------\n", res), file = cohort_analysis_log, append = TRUE)
-      if("try-error" %in% class(res)){
-       res <- FALSE
-      }
-      return(res)
-    }, mc.cores = min(cores, nsamples)
-  )
 
   # Output time taken
   end.time <- Sys.time()
   time.taken <- round(end.time - start.time,2)
-  cli::cli_alert_info("Cohort analysis completed in {time.taken} seconds")
+  if(verbose) cli::cli_alert_info("Cohort analysis completed in {time.taken} seconds")
 
   # Check how many were successful
   succeeded <- unlist(successful)
@@ -802,12 +872,12 @@ sig_analyse_cohort_from_files <- function(manifest,
     cli::cli_alert_warning("Analysis of {total_failed}/{total} samples failed. See {.path {cohort_analysis_log}} for details")
   }
   else
-    cli::cli_alert_success("Analysis of all {total} samples was successful")
+    cli::cli_alert_success("Analysis of all {total} samples was successful. See {.path {output_dir}} for results.")
 
   return(invisible(NULL))
 }
 
-parse_manifest <- function(manifest, sep = "\t", check_files_exist=TRUE, as_list = TRUE){
+parse_manifest <- function(manifest, sep = "\t", check_files_exist=TRUE, as_list = TRUE, verbose = TRUE){
   df_manifest <- utils::read.csv(manifest, sep = sep, header = TRUE)
 
   # Assert not empty
@@ -831,7 +901,7 @@ parse_manifest <- function(manifest, sep = "\t", check_files_exist=TRUE, as_list
   }
 
   # Alert success
-  cli::cli_alert_success("Found required columns in manifest: [{.strong {found_cols}}]")
+  if(verbose) { cli::cli_alert_success("Found required columns in manifest: [{.strong {found_cols}}]")}
 
   # Assert no duplicate sample ids
   assertions::assert_no_duplicates(df_manifest[[col_sample]])
@@ -853,3 +923,5 @@ parse_manifest <- function(manifest, sep = "\t", check_files_exist=TRUE, as_list
 
   return(ls_manifest)
 }
+
+

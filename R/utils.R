@@ -26,10 +26,17 @@ vcf2versions <- function(path_to_vcf){
 }
 
 
-capture_messages <- function(logfile, expr) {
+capture_messages <- function(logfile, tee=TRUE, expr) {
   messages <- utils::capture.output(expr, type = "message")
   cat(messages, file = logfile, append = TRUE, sep = "\n")
-  cat(messages, sep = "\n")
+  if(tee) cat(messages, sep = "\n")
+}
+
+silence_messages <- function(verbose, expr){
+  if(!verbose)
+    suppressMessages(expr)
+  else
+    expr
 }
 
 #' Write compressed CSV
@@ -768,4 +775,9 @@ sigminer_channels <- function() {
       "T[TT>GG]C", "T[TT>GG]G", "T[TT>GG]T"
     )
   )
+}
+
+
+catalogue_to_wide <- function(df_catalogue, class, col_sample = NULL){
+  tidyr::pivot_wider(df_catalogue, names_from = "channel", values_from = fraction, id_cols = col_sample, names_prefix = paste0(class, "|"))
 }
