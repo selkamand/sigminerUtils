@@ -251,11 +251,10 @@ build_umap_reference_set <- function(df_catalogues, seed=111, outfolder, umap_n_
   if(v) cli::cli_progress_step("Writing {curr_class} umap reference to {.file {outfile_umap}}")
   lapply(names(ls_umaps), \(curr_class){
     curr_umap_outfile <- paste0(outfile_umap_prefix, ".", curr_class)
-
     uwot::save_uwot(
       model = ls_umaps[[curr_class]],
       file = curr_umap_outfile,
-      unload = FALSE
+      unload = TRUE
     )
     }
   )

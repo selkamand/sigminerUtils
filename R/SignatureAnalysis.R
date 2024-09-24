@@ -409,7 +409,6 @@ sig_analyse_mutations <- function(
       }
 
       # Project to existing UMAP
-      browser()
       umap_currentclass <- ref_umaps[[class]]
       if(!is.null(umap_currentclass)){
         # Get the columns we need to feed to umap
