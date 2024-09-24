@@ -61,7 +61,6 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results/COLO
     df_bootstrap_summary <- read_bootstrap_summary(bootstrap_summary$filepath)
 
 
-
     valid_sigs <- df_bootstrap_summary |>
       subset(experimental_pval < sparsity_pvalue, select=Sig, drop = TRUE)
 

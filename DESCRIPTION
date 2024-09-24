@@ -9,7 +9,8 @@ Description: A collection of utilities for running signature analysis with sigmi
 License: MIT + file LICENSE
 Suggests: 
     spelling,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    uwot
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -38,7 +39,6 @@ Imports:
     stats,
     tibble,
     tidyr,
-    umap,
     utils
 Remotes: 
     selkamand/sigstash,

@@ -10,6 +10,7 @@ sig_create_reference_set(
   format = c("parquet", "csv.gz"),
   create_umaps = TRUE,
   umap_n_neighbours = 15,
+  seed = 111,
   verbose = TRUE
 )
 }

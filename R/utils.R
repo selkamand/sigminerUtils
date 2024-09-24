@@ -776,3 +776,8 @@ sigminer_channels <- function() {
     )
   )
 }
+
+
+catalogue_to_wide <- function(df_catalogue, class, col_sample = NULL){
+  tidyr::pivot_wider(df_catalogue, names_from = "channel", values_from = fraction, id_cols = col_sample, names_prefix = paste0(class, "|"))
+}

@@ -19,6 +19,7 @@ sig_create_reference_set <- function(
     format=c("parquet", "csv.gz"),
     create_umaps = TRUE,
     umap_n_neighbours=15,
+    seed=111,
     verbose = TRUE
     ){
   # ---- Assertions ---- #
@@ -27,7 +28,10 @@ sig_create_reference_set <- function(
   cli::cli_alert_info
   if(!file.exists(outfolder))  dir.create(outfolder, recursive	= TRUE)
   if(!file.exists(outfolder))  dir.create(outfolder, recursive	= TRUE)
+  if(create_umaps) rlang::check_installed("uwot", reason = "Creating UMAPs in reference set requires the 'uwot' pacakge to be installed. Please run install.packages('uwot') and restart R.")
 
+  # Convert outfolder to absolute filepath
+  outfolder = normalizePath(outfolder, mustWork = TRUE)
   outfile_tally <- paste0(outfolder, "/refmatrix.tally.", format)
   outfile_exposures <- paste0(outfolder, "/refmatrix.exposures.", format)
   outfile_bootstraps <- paste0(outfolder, "/refmatrix.bootstraps.", format)
@@ -50,7 +54,7 @@ sig_create_reference_set <- function(
   # Create UMAP reference ---------------------------------------------------
   if(v) cli::cli_h1("UMAPs (from sample catalogues)")
   if (create_umaps){
-    build_umap_reference_set(df_catalogues, outfolder = outfolder, umap_n_neighbours = umap_n_neighbours, verbose=verbose)
+    build_umap_reference_set(df_catalogues, outfolder = outfolder, umap_n_neighbours = umap_n_neighbours, seed=seed, verbose=verbose)
   }else
     cli::cli_alert_warning("Skipping UMAP creation since {.arg create_umaps = FALSE}")
 
@@ -172,7 +176,7 @@ build_catalogue_reference_set <- function(df_catalogues, outfile_tally, format, 
   if(v) cli::cli_alert_success("Tally refmatrix succesfully created")
 }
 
-build_umap_reference_set <- function(df_catalogues, outfolder, umap_n_neighbours, verbose=TRUE){
+build_umap_reference_set <- function(df_catalogues, seed=111, outfolder, umap_n_neighbours, verbose=TRUE){
   v <- verbose
 
   # Lets turn each feature in our tally into a a column and each sample into a row (values are fraction) - then we can create
@@ -205,8 +209,9 @@ build_umap_reference_set <- function(df_catalogues, outfolder, umap_n_neighbours
       cli::cli_abort("{.arg umap_n_neighbours} must be smaller than the number of samples in your dataset (<={n_samples_with_tallies_for_currrent_class})")
     }
 
+
     # Perform UMAP
-    umap <- umap::umap(d = class_specific_table_no_missing, n_neighbors = umap_n_neighbours, method = "naive", preserve.seed = TRUE)
+    umap <- uwot::umap(class_specific_table_no_missing, n_neighbors = umap_n_neighbours, ret_model = TRUE, seed = seed, batch=TRUE)
 
     # Write Umap to compressed Rds file (will be used in predictions)
     if(v) cli::cli_progress_step("Adding {curr_class} umap reference to list")
@@ -236,17 +241,24 @@ build_umap_reference_set <- function(df_catalogues, outfolder, umap_n_neighbours
   }
 
   # Perform UMAP
-  umap <- umap::umap(d = class_specific_table_no_missing, n_neighbors = umap_n_neighbours, method = "naive", preserve.seed = TRUE)
+  umap <- uwot::umap(class_specific_table_no_missing, n_neighbors = umap_n_neighbours, ret_model = TRUE, seed = seed, batch=TRUE)
 
   # Add to
   ls_umaps[["all_classes"]] <- umap
 
-  # Write list of umaps to compressed Rds file (will be used in predictions)
-  outfile_umap <- paste0(outfolder, "/refmatrix.umaps.rds.bz2")
+  # Serialise umaps (need to be loaded with uwot::load_uwot() for projecting new data)
+  outfile_umap_prefix <- paste0(outfolder, "/refmatrix.umaps")
   if(v) cli::cli_progress_step("Writing {curr_class} umap reference to {.file {outfile_umap}}")
-  saveRDS(ls_umaps, compress = "bzip2", file = outfile_umap)
+  lapply(names(ls_umaps), \(curr_class){
+    curr_umap_outfile <- paste0(outfile_umap_prefix, ".", curr_class)
 
-  remove(umap)
+    uwot::save_uwot(
+      model = ls_umaps[[curr_class]],
+      file = curr_umap_outfile,
+      unload = FALSE
+    )
+    }
+  )
 }
 
 build_exposures_reference_set <- function(df_exposures, outfile, format, verbose=TRUE){

@@ -18,6 +18,7 @@ sig_analyse_mutations_single_sample_from_files(
   db_cn = NULL,
   db_sv = NULL,
   ref_tallies = NULL,
+  ref_umaps = NULL,
   ref = c("hg38", "hg19"),
   output_dir = "./signatures",
   exposure_type = c("absolute", "relative"),
@@ -54,6 +55,8 @@ Alternatively, you can supply a path to signature collections in tidy_csv format
 
 \item{ref_tallies}{path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using \code{\link[=sig_create_reference_set]{sig_create_reference_set()}}.
 If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.}
+
+\item{ref_umaps}{path to an Rds file representing a serialised list of umap objects for different collection types. Produced by \code{\link[=sig_create_reference_set]{sig_create_reference_set()}}.}
 
 \item{ref}{A character vector specifying the reference genome. One of 'hg38' or 'hg19'.}
 

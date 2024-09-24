@@ -57,6 +57,8 @@ library(sigminerUtils)
 unlink("pcawg_signature_results", recursive = TRUE)
 unlink("colo829_signature_results", recursive = TRUE)
 unlink("pcawg_reference_set", recursive = TRUE)
+unlink("colo829_signature_results_with_refset", recursive = TRUE)
+
 ```
 
 ```{r, eval = FALSE}
@@ -112,5 +114,29 @@ sig_create_reference_set(
   create_umaps = TRUE, 
   umap_n_neighbours = 2,
   verbose=FALSE
+)
+```
+
+
+### Rerun Analysis using Reference Sets
+
+Once a reference set has been produced, it can be used in any single sample / cohort analysis to produce additional outputs (umap_plot data + similar sample analysis)
+
+```{r}
+path_snvs <- system.file("colo829_testfiles/COLO829v003T.purple.somatic.vcf.gz", package = "sigminerUtils")
+path_cnvs <- system.file("colo829_testfiles/COLO829v003T.purple.cnv.somatic.tsv", package = "sigminerUtils")
+path_svs <-  system.file("colo829_testfiles/COLO829v003T.purple.sv.vcf.gz", package = "sigminerUtils")
+
+
+sig_analyse_mutations_single_sample_from_files(
+  sample_id = "COLO829v003T", 
+  vcf_snv = path_snvs, 
+  segment = path_cnvs, 
+  vcf_sv = path_svs, 
+  ref_tallies = "pcawg_reference_set/refmatrix.tally.parquet",
+  ref_umaps = "pcawg_reference_set/refmatrix.umaps.rds.bz2",
+  include = "pass",
+  ref = "hg38",
+  output_dir = "colo829_signature_results_with_refset"
 )
 ```

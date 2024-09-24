@@ -21,7 +21,9 @@
 #' @param db_sbs_name,db_indel_name,db_dbs_name,db_cn_name,db_sv_name names of signature databases (used for logs). If NULL, will try and lookup using [sigstash::sig_identify_collection()].
 #' @param ref_tallies path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using [sig_create_reference_set()].
 #' If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.
+#' @param ref_umaps path to an Rds file representing a serialised list of umap objects for different collection types. Produced by [sig_create_reference_set()].
 #' @param cores Number of cores to use.
+#' @param seed used for umap projection
 #' @return None.
 #' @export
 #' @importFrom rlang `%||%`
@@ -47,19 +49,28 @@ sig_analyse_mutations <- function(
     db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
     db_sbs_name = NULL, db_indel_name = NULL, db_dbs_name = NULL, db_cn_name = NULL, db_sv_name = NULL,
     ref_tallies = NULL,
+    ref_umaps = NULL,
+    seed = 111,
     min_contribution_threshold = 0.05,
     ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"),
     n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
 
   # TODO: REMOVE locale setting once sigstash issue https://github.com/selkamand/sigstash/issues/43 is resolved
   Sys.setlocale("LC_COLLATE", "C")
+
   cli::cli_h1("Mutational Signature Analysis")
   cli::cli_h2("Checking arguments")
+  #browser()
+  # Assertions
   ref <- rlang::arg_match(ref)
   exposure_type <- rlang::arg_match(exposure_type)
   if(!is.null(copynumber)) { assertions::assert_dataframe(copynumber); cn=TRUE} else cn = FALSE
   if(!is.null(structuralvariant)) { assertions::assert_dataframe(structuralvariant); sv = TRUE} else sv = FALSE
-
+  if(!is.null(ref_tallies)) { assertions::assert_directory_exists(ref_tallies)}
+  if(!is.null(ref_umaps)) {
+    assertions::assert_file_exists(ref_umaps)
+    ref_umaps <- readRDS(ref_umaps)
+  }
 
   # Define default signature collections based on reference genome
   if(ref == "hg38"){
@@ -396,6 +407,18 @@ sig_analyse_mutations <- function(
         )
         cli::cli_alert_success("Similarities written to csv : {.path {tmp_tally_outfile}.gz}")
       }
+
+      # Project to existing UMAP
+      browser()
+      umap_currentclass <- ref_umaps[[class]]
+      if(!is.null(umap_currentclass)){
+        # Get the columns we need to feed to umap
+        # expected_cols <- colnames(umap_currentclass$data)
+
+        df_tally_wide=catalogue_to_wide(df_tally, class=class)
+        coords <- uwot::umap_transform(df_tally_wide, model=umap_currentclass, seed = seed, batch = TRUE)
+      }
+
     }
   }
 
@@ -601,6 +624,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
     allow_multisample = TRUE,
     db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
     ref_tallies = NULL,
+    ref_umaps = NULL,
     ref = c('hg38', 'hg19'),
     output_dir = "./signatures",
     exposure_type = c("absolute", "relative"),
@@ -664,6 +688,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
           structuralvariant = svs,
           db_sbs = db_sbs, db_indel = db_indel, db_dbs = db_dbs, db_cn = db_cn, db_sv = db_sv,
           ref_tallies=ref_tallies,
+          ref_umaps = ref_umaps,
           ref = ref,
           output_dir = sample_dir,
           exposure_type = exposure_type,
