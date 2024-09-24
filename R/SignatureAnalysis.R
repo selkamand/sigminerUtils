@@ -416,6 +416,7 @@ sig_analyse_mutations <- function(
       }
 
       # Read the umap reference
+      rlang::check_installed("uwot", reason = "Creating UMAPs requires the 'uwot' pacakge to be installed. Please run install.packages('uwot') and restart R.")
       umap_model <- uwot::load_uwot(path_umap)
 
       # Convert catalogue to the right form

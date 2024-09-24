@@ -10,6 +10,7 @@
 #' The value determines the size of the local neighborhood UMAP which is used to learn the manifold structure of the data.
 #' Lower values focus on local details. higher values emphasise more global patterns. Must be less than the number of samples in your dataset.
 #' @param create_umaps should umap references be created (flag)
+#' @param seed random seed used for umap generation
 #' @param verbose verbose (flag)
 #' @export
 #'
