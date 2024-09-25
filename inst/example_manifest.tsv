@@ -1,0 +1,5 @@
+sample	snv	copynumber	sv
+sample1	path/to/sample1/snv.vcf	path/to/sample1/copynumber.tsv	path/to/sample1/sv.vcf
+sample2	path/to/sample2/snv.vcf	path/to/sample2/copynumber.tsv	path/to/sample2/sv.vcf
+sample3	path/to/sample3/snv.vcf	path/to/sample3/copynumber.tsv	path/to/sample3/sv.vcf
+sample4	path/to/sample4/snv.vcf	path/to/sample4/copynumber.tsv	path/to/sample4/sv.vcf
