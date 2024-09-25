@@ -53,7 +53,9 @@ sig_analyse_mutations <- function(
     seed = 111,
     min_contribution_threshold = 0.05,
     ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"),
-    n_bootstraps = 100, temp_dir = tempdir(), cores = future::availableCores()){
+    n_bootstraps = 100, temp_dir = tempdir(),
+    cores = 1
+    ){
 
   # TODO: REMOVE locale setting once sigstash issue https://github.com/selkamand/sigstash/issues/43 is resolved
   Sys.setlocale("LC_COLLATE", "C")
@@ -668,8 +670,8 @@ sig_analyse_mutations_single_sample_from_files <- function(
     n_bootstraps = 100,
     temp_dir = tempdir(),
     verbose = TRUE,
-    cores = 1)
-  {
+    cores = 1
+  ){
 
     # Check files exist
     if(!is.null(vcf_snv)) assertions::assert_file_exists(vcf_snv)

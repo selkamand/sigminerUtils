@@ -25,7 +25,7 @@ sig_analyse_mutations_single_sample_from_files(
   n_bootstraps = 100,
   temp_dir = tempdir(),
   verbose = TRUE,
-  cores = future::availableCores()
+  cores = 1
 )
 }
 \arguments{
