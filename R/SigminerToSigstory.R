@@ -4,13 +4,13 @@
 #'  This function takes the outputs of sigminerUtils and parses them into sigstory ready visualisations & analysies
 #'
 #' @param signature_folder folder containing signature data
-#' @param rds_outfile file to store resulting sigstory-powering list as.
+#' @param rds_outfile file to store serialised signature results that can serve as sigstory input.
 #' @param sparsity_pvalue  max p-value, below which we consider the signatures to be stable across bootstraps. See [sigstats::sig_compute_experimental_p_value()] for pvalue computation.
 #'
 #' @return A list with all the information required to build a signature report
 #' @export
 #'
-sigminer2sigstory <- function(signature_folder = "colo829_signature_results/COLO829v003T", rds_outfile = "result_tree.rds", sparsity_pvalue = 0.05){
+sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with_refset/COLO829v003T", rds_outfile = "result_tree.rds", sparsity_pvalue = 0.05){
   assertions::assert_directory_exists(signature_folder)
   df_files = parse_sigminer_utils_outputs(signature_folder)
 
