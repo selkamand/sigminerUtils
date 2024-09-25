@@ -77,7 +77,10 @@ sig_analyse_mutations_single_sample_from_files(
 
 ### Run in Cohort Mode using a manifest file
 
-Run on a cohort of samples using a manifest file (see `?sig_analyse_cohort_from_files()` for details on the expected manifest format)
+Run on a cohort of samples using a [manifest file](inst/example_manifest.tsv).
+
+> [!NOTE]  
+> See `?sig_analyse_cohort_from_files()` for details on the expected manifest format
 
 ```{r}
 # Extract PCAWG data into working directory
