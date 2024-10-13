@@ -11,7 +11,11 @@
 #' @export
 #'
 sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with_refset/COLO829v003T", rds_outfile = "result_tree.rds", sparsity_pvalue = 0.05){
+
+  # Check Signature Folder Exists
   assertions::assert_directory_exists(signature_folder)
+
+  # Get all files in the signature directory
   df_files = parse_sigminer_utils_outputs(signature_folder)
 
   sample = unique(na.omit(df_files[["sample"]]))
@@ -47,6 +51,8 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
     collection_name=ls_sig_collection_names[[sigclass]]
     tally = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "tally", .drop = FALSE][1,])
     expo = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "expo", .drop = FALSE][1,])
+    similarity = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "similarity", .drop = FALSE][1,])
+    umap = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "umap", .drop = FALSE][1,])
     bootstrap_summary = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "bootstrap_summary", .drop = FALSE][1,])
     bootstraps = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "expo_bootstraps", .drop = FALSE][1,])
 
@@ -59,7 +65,9 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
     df_exposures <- read_expo(expo$filepath)
     df_bootstraps <- read_bootstraps(bootstraps$filepath)
     df_bootstrap_summary <- read_bootstrap_summary(bootstrap_summary$filepath)
-
+    df_similarity <- read_similarity(similarity$filepath)
+    n_comparison_samples <- if(is.null(df_similarity)) 0 else nrow(df_similarity)
+    df_umap <- read_umap(umap$filepath)
 
     valid_sigs <- df_bootstrap_summary |>
       subset(experimental_pval < sparsity_pvalue, select=Sig, drop = TRUE)
@@ -78,6 +86,7 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
       model = model,
       format = "signature"
     )
+
     cosine_reconstructed_vs_tally <- sigstats::sig_cosine_similarity(signature1 = df_reconstructed, df_tally)
 
     gg_reconstructed_vs_observed <-  sigvis::sig_visualise_compare_reconstructed_to_observed(
@@ -107,28 +116,47 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
     )
 
     # Plot Dotplot
-    browser()
+
+    # Plot Umap
+    gg_umap <- if(!is.null(df_umap)){
+      df_metadata <- sigshared::bselect(df_umap, columns = "sample")
+      df_metadata[["colour"]] <- dplyr::case_when(
+          df_metadata[["sample"]] == sample ~ sample,
+          .default = "other",
+        )
+      umap_colour_pal <- c("#D55E00", "#999999")
+      names(umap_colour_pal) <- c(sample, "other")
+
+    sigvis::sig_visualise_dimred(df_umap, metadata = df_metadata, col_colour = "colour") +
+      ggplot2::scale_colour_manual(values = umap_colour_pal)
+    }
+    else
+      NULL
+
     # Add Results to Tree
     result_tree[[sigclass]] <- list(
       collection_name = collection_name,
       df_tally = df_tally,
       df_exposures = df_exposures,
       df_exposures_valid = df_exposures_valid,
+      df_umap = df_umap,
+      n_comparison_samples = n_comparison_samples, # Number of reference samples checked for similarity to the current sample
+      df_similarity = df_similarity,
       model=model,
       total_mutations = total_mutations,
+      unexplained_mutations = unexplained_mutations,
       proportion_of_unexplained_mutations = unexplained_mutations/total_mutations,
       cosine_reconstructed_vs_observed = cosine_reconstructed_vs_tally,
       df_bootstraps = df_bootstraps,
       df_bootstrap_summary = df_bootstrap_summary,
       gg_reconstructed_vs_observed = gg_reconstructed_vs_observed,
       gg_signature_stability = gg_signature_stability,
+      gg_umap = gg_umap,
+      sigclass = sigclass,
       fitting_method = "Sigminer QP"
     )
-
-
   }
 
-  #browser()
   #saveRDS(result_tree, rds_outfile)
   return(result_tree)
 }
@@ -162,6 +190,7 @@ read_sig_collection_names <- function(filepath){
   names(l) <- df[[1]]
   return(l)
 }
+
 read_bootstrap_summary <- function(filepath){
   assertions::assert_file_exists(filepath)
   df <- read.csv(filepath, header = TRUE)
@@ -176,6 +205,21 @@ read_bootstraps <- function(filepath){
   return(df)
 }
 
+read_similarity <- function(filepath){
+  if(is.na(filepath)) return(NULL);
+  assertions::assert_file_exists(filepath)
+  df <- read.csv(filepath, header = TRUE)
+  df <- tibble::as_tibble(df)
+  return(df)
+}
+
+read_umap <- function(filepath){
+  if(is.na(filepath)) return(NULL);
+  assertions::assert_file_exists(filepath)
+  df <- read.csv(filepath, header = TRUE)
+  df <- tibble::as_tibble(df)
+  return(df)
+}
 
 read_tally <- function(filepath, convert_channels_to_cosmic = TRUE){
   assertions::assert_file_exists(filepath)

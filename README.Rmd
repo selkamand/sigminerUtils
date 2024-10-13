@@ -151,3 +151,12 @@ sig_analyse_mutations_single_sample_from_files(
   verbose = FALSE
 )
 ```
+
+### Parse Results into SigStory object
+
+```{r}
+sigstory = sigminer2sigstory(
+  signature_folder = "colo829_signature_results_with_refset/COLO829v003T/"
+)
+```
+
