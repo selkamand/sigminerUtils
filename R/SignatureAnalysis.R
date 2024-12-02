@@ -103,7 +103,7 @@ sig_analyse_mutations <- function(
   db_cn <- db_read_if_filepath(db_cn, dbtype="db_cn")
   db_sv <- db_read_if_filepath(db_sv, dbtype="db_sv")
 
-  # If signature collection names are NULL, see if we can identify based on their md5
+  # If signature collection names are NULL, attempt to identify based on their md5sum
   if(!is.null(db_sbs)) db_sbs_name <- db_sbs_name %||% sigstash::sig_identify_collection(db_sbs, return = 'name')
   if(!is.null(db_indel)) db_indel_name <- db_indel_name %||% sigstash::sig_identify_collection(db_indel, return = 'name')
   if(!is.null(db_dbs)) db_dbs_name <- db_dbs_name %||% sigstash::sig_identify_collection(db_dbs, return = 'name')
@@ -111,7 +111,7 @@ sig_analyse_mutations <- function(
   if(!is.null(db_sv)) db_sv_name <- db_sv_name %||% sigstash::sig_identify_collection(db_sv, return = 'name')
 
 
-  # If signature collection names couldn't be identified, throw an error
+  # If signature collection names could not be identified, throw an error
   assertions::assert(is.null(db_sbs) | db_sbs_name != "Uncertain", msg = "For logging purposes, signature collections must be named. Either supply name to {.arg db_sbs_name} argument or use a sigstash collection whose name can be identified using sigstash::sig_identify_collection()")
   assertions::assert(is.null(db_indel) | db_indel_name != "Uncertain", msg = "For logging purposes, signature collections must be named. Either supply name to {.arg db_indel_name} argument or use a sigstash collection whose name can be identified using sigstash::sig_identify_collection()")
   assertions::assert(is.null(db_dbs) | db_dbs_name != "Uncertain", msg = "For logging purposes, signature collections must be named. Either supply name to {.arg db_dbs_name} argument or use a sigstash collection whose name can be identified using sigstash::sig_identify_collection()")
@@ -168,7 +168,7 @@ sig_analyse_mutations <- function(
   }
 
   # By this point the maf variable must contain a MAF object
-  assertions::assert_class(maf, class = "MAF", msg = "maf input in an unexpected format. Please supply maf argument as either a path to a MAF file, a data.frame with MAF columns, or a MAF object from maftools. If you're input format is acceptable please check that your file/object conforms to the MAF specification")
+  assertions::assert_class(maf, class = "MAF", msg = "maf input in an unexpected format. Please supply maf argument as either a path to a MAF file, a data.frame with MAF columns, or a MAF object from maftools. If you supplied a data.frame or a filepath, please check that your file/object conforms to the MAF specification")
 
   cli::cli_h2("Tally (Small Variants)")
   tally_sbs <- tally(
@@ -291,7 +291,6 @@ sig_analyse_mutations <- function(
   id83_fit <- sigminer::sig_fit_bootstrap_batch(
     catalog = id_83_matrices,
     sig = db_indel,
-    #sig_db = "ID",  # Use 'legacy' for V2
     sig_index= NULL,
     n = n_bootstraps,
     method = "QP",
@@ -309,8 +308,6 @@ sig_analyse_mutations <- function(
   dbs78_fit <- sigminer::sig_fit_bootstrap_batch(
     catalog = dbs_78_matrices,
     sig = db_dbs,
-    #sig_db = "DBS",  # Use 'legacy' for V2
-    #sig_index= "ALL",
     n = n_bootstraps,
     method = "QP",
     min_count = 1L,
@@ -328,8 +325,6 @@ sig_analyse_mutations <- function(
     cn48_fit <- sigminer::sig_fit_bootstrap_batch(
       catalog = cn_48_matrices,
       sig = db_cn,
-      #sig_db = "DBS",  # Use 'legacy' for V2
-      #sig_index= "ALL",
       n = n_bootstraps,
       method = "QP",
       min_count = 1L,
@@ -338,7 +333,6 @@ sig_analyse_mutations <- function(
       seed = 123456L,
       job_id = NULL,
       result_dir = temp_dir,
-      #mode = "copynumber",
       type = exposure_type # could be 'relative' or 'absolute'
     ) |> try() |> try_error_to_null()
   }
@@ -348,8 +342,6 @@ sig_analyse_mutations <- function(
     sv32_fit <- sigminer::sig_fit_bootstrap_batch(
       catalog = sv_32_matrices,
       sig = db_sv,
-      #sig_db = "DBS",  # Use 'legacy' for V2
-      #sig_index= "ALL",
       n = n_bootstraps,
       method = "QP",
       min_count = 1L,
@@ -364,102 +356,6 @@ sig_analyse_mutations <- function(
 
   cli::cli_h2("Write Output")
   cli::cli_h3("Raw counts (tally)")
-
-  # Longify tally Matrices (result of prepare_matrix)
-  fix_tally <- function(matrix){
-    matrix |>
-      as.data.frame() |>
-      tibble::rownames_to_column(var="Context") |>
-      tidyr::pivot_longer(cols = -1, names_to = "SampleID", values_to = "Count") |>
-      dplyr::mutate(CountRelative = Count / sum(Count), .by = SampleID) |>
-      dplyr::relocate(SampleID)
-  }
-
-  write_tally_matrix <- function(matrix, class, output_dir, ref){
-    samples = colnames(tally_ls[[1]])
-
-    df_longform_tally <- fix_tally(matrix)
-    ls_longform <- split(df_longform_tally, f = df_longform_tally[["SampleID"]])
-    for (sample in names(ls_longform)){
-      tmp_tally_outfile = glue::glue("{output_dir}/{class}_catalogue.{sample}.{ref}.tally.csv.gz")
-      df_tally <- dplyr::select(ls_longform[[sample]], -SampleID)
-      df_tally <- dplyr::rename(df_tally, channel=Context, count=Count, fraction=CountRelative)
-      df_tally[["channel"]] <- sigstash::sig_convert_channel_name(df_tally[["channel"]], from = "sigminer", to = "cosmic")
-      df_tally[["type"]] <- sigstash::sig_convert_channel2type(df_tally[["channel"]], sigclass = class)
-      df_tally[["fraction"]] <- ifelse(is.na(df_tally[["fraction"]]), yes = 0, no = df_tally[["fraction"]])
-      df_tally <- df_tally[c("channel", "type", "fraction", "count")]
-
-      write_compressed_csv(
-        x = df_tally,
-        file = tmp_tally_outfile
-      )
-      cli::cli_alert_success("{class} tally written to csv: {.path {tmp_tally_outfile}}")
-
-      # Compare to Reference Set
-      if(!is.null(ref_tallies)){
-        tally_similarity_outfile = glue::glue("{output_dir}/{class}_comparison.{sample}.{ref}.similarity.csv.gz")
-        cli::cli_alert_info("Computing tally similarity to reference dataset: {.file {ref_tallies}}")
-        df_similarity <- compute_similarity_against_reference_set(tally_file = tmp_tally_outfile, ref_tallies = ref_tallies)
-        write_compressed_csv(
-          x = df_similarity,
-          file = tally_similarity_outfile
-        )
-        cli::cli_alert_success("Similarities written to csv : {.path {tmp_tally_outfile}.gz}")
-      }
-
-      # Project to existing UMAP
-      if(is.null(ref_umaps_prefix)){
-        cli::cli_alert_info("Skipping projection onto {class} reference umaps because {.arg ref_umaps_prefix} argument was not supplied")
-        next
-      }
-      path_umap = paste0(ref_umaps_prefix, '.', class)
-      if(!file.exists(path_umap)){
-        cli::cli_alert_info("Skipping projection onto {class} reference umap since could not find file {path_umap}")
-        next
-      }
-
-      # Read the umap reference
-      rlang::check_installed("uwot", reason = "Creating UMAPs requires the 'uwot' pacakge to be installed. Please run install.packages('uwot') and restart R.")
-      umap_model <- uwot::load_uwot(path_umap)
-
-      # Convert catalogue to the right form
-      df_tally_wide <- catalogue_to_wide(df_tally, class=class)
-
-      # Check column order matches expected from umap
-      assertions::assert_identical(
-        colnames(df_tally_wide), umap_model$column_order,
-        msg = "Failed to project {class} features onto umap for sample {sample} because channel order
-        does not match what was used build the original UMAP"
-      )
-
-      # Project onto existing umap
-      coords <- uwot::umap_transform(df_tally_wide, model=umap_model, seed = seed, batch = TRUE)
-
-      # Prepare ref matrix dataframe
-      df_coords_refmatrix <- as.data.frame(umap_model$embedding)
-      df_coords_refmatrix[["sample"]] <- rownames(df_coords_refmatrix)
-      df_coords_refmatrix <- df_coords_refmatrix[!df_coords_refmatrix$sample %in% sample,]
-      rownames(df_coords_refmatrix) <- NULL
-
-      # Prepare UMAP coordinate data.frame for sample of interest
-      df_coords_sample <- as.data.frame(coords)
-      df_coords_sample[["sample"]] <- sample
-
-      # Combine the two
-      df_coords <- rbind(df_coords_sample, df_coords_refmatrix)
-      colnames(df_coords) <- c("dim1" , "dim2", "sample")
-
-      # Add sample metadata
-      # TODO: add sample_metadata arg (first add to reference matrix creation function)
-
-      # Write the resulting UMAP dataset
-      path_umap_output <- glue::glue("{output_dir}/{class}_umap.{sample}.{ref}.umap.csv.gz")
-      write_compressed_csv(x = df_coords, file = path_umap_output)
-
-      cli::cli_alert_success("UMAP written to csv : {.path {path_umap_output}.gz}")
-    }
-  }
-
 
   # Create Tally List
   tally_ls <- list(
@@ -482,135 +378,14 @@ sig_analyse_mutations <- function(
   for (class in names(tally_ls)){
     write_tally_matrix(matrix = tally_ls[[class]], class = class, output_dir=output_dir,ref=ref)
   }
+
   cli::cli_h3("Fit (Exposures)")
-
-  # Functions to pluck different types
-  bootstrap_pluck_expo <- function(fit){
-
-    # Pluck the summary so we can annotate signatures with their bootstrap-computed p-value
-    df_bootstrap_summary <- dplyr::select(.data = bootstrap_pluck_summary(fit), SampleID, Sig, experimental_pval)
-
-    fit$expo |>
-      dplyr::rename(SampleID = sample, Contribution = exposure, Sig=sig, Method = method, Type = type)  |>
-      dplyr::filter(Type == "optimal") |>
-      dplyr::mutate(ContributionRelative = Contribution / sum(Contribution, na.rm = TRUE), .by = c(SampleID, Type)) |>
-      dplyr::left_join(df_bootstrap_summary, by = c("SampleID", "Sig")) |>
-      dplyr::select(-Type, -Method) |>
-      dplyr::relocate(.after = dplyr::everything(), c(Contribution, ContributionRelative))
-  }
-
-  bootstrap_pluck_expo_bootstraps <- function(fit){
-    fit$expo |>
-      dplyr::rename(SampleID = sample, Contribution = exposure, Sig=sig, Method = method, Type = type)  |>
-      dplyr::filter(Type != "optimal") |>
-      dplyr::mutate(ContributionRelative = Contribution / sum(Contribution, na.rm = TRUE), .by = c(SampleID, Type)) |>
-      dplyr::relocate(.after = dplyr::everything(), c(Contribution, ContributionRelative))
-
-  }
-
-  bootstrap_pluck_error_and_cosine <- function(fit){
-    df_error <- fit$error |>
-      dplyr::rename(Errors = errors, SampleID = sample, Type = type, Method = method) |>
-      dplyr::filter(Type == "optimal") |>
-      dplyr::relocate(Method, SampleID, Type)
-
-    df_cosine <- fit$cosine |>
-      dplyr::rename(Cosine = cosine, SampleID = sample, Type = type, Method = method) |>
-      dplyr::filter(Type == "optimal") |>
-      dplyr::relocate(Method, SampleID, Type)
-
-    df_error_and_cosine <- dplyr::left_join(x = df_error, y = df_cosine, by = c("SampleID", "Method", "Type"))
-    return(df_error_and_cosine)
-  }
-
-  bootstrap_pluck_error_and_cosine_bootstraps <- function(fit){
-    df_error <- fit$error |>
-      dplyr::rename(Errors = errors, SampleID = sample, Type = type, Method = method) |>
-      dplyr::filter(Type != "optimal") |>
-      #dplyr::mutate(IsOptimal = Type == "optimal") |>
-      dplyr::relocate(Method, SampleID, Type)
-
-    df_cosine <- fit$cosine |>
-      dplyr::rename(Cosine = cosine, SampleID = sample, Type = type, Method = method) |>
-      dplyr::filter(Type != "optimal") |>
-      dplyr::relocate(Method, SampleID, Type)
-
-    df_error_and_cosine <- dplyr::left_join(x = df_error, y = df_cosine, by = c("SampleID", "Method", "Type"))
-    return(df_error_and_cosine)
-  }
-
-  bootstrap_pluck_pval <- function(fit){
-    fit$p_val |>
-      dplyr::rename(Threshold = threshold, Sig = sig, SampleID = sample, Method = method, Pvalue = p_value) |>
-      dplyr::relocate(Method, SampleID)
-  }
-
-  bootstrap_pluck_summary <- function(fit){
-    # Summarise the bootstraps by signature with all the information required to filter sigs.
-    df_bootstraps <- bootstrap_pluck_expo_bootstraps(fit)
-    df_summary <- df_bootstraps |>
-      dplyr::summarise(
-        boxplotstats::calculate_boxplot_stats(ContributionRelative, outliers_as_strings = TRUE),
-        experimental_pval = sigstats::sig_compute_experimental_p_value(ContributionRelative, threshold = min_contribution_threshold),
-        .by = c(SampleID, Sig)
-        )
-    return(df_summary)
-  }
-
-
-  write_model_outputs <- function(output_dir, fit, fit_type = "SBS96", ref){
-
-    # Skip if fit is NULL (means there were no mutations of fit_type)
-    if(is.null(fit)) {
-      cli::cli_alert_warning("No model outputs produced for class {fit_type}")
-      return(NULL)
-    }
-
-    for (fit_metric in c(
-      "expo", "expo_bootstraps", "bootstrap_summary" , "error_and_cosine", "error_and_cosine_bootstraps",  "p_val")
-      ){
-      if(fit_metric == "expo")
-        res <- bootstrap_pluck_expo(fit)
-      else if(fit_metric == "expo_bootstraps")
-        res <- bootstrap_pluck_expo_bootstraps(fit)
-      else if(fit_metric == "bootstrap_summary")
-        res <- bootstrap_pluck_summary(fit)
-      else if(fit_metric == "error_and_cosine")
-        res <- bootstrap_pluck_error_and_cosine(fit)
-      else if(fit_metric == "error_and_cosine_bootstraps")
-        res <- bootstrap_pluck_error_and_cosine_bootstraps(fit)
-      else if(fit_metric == "p_val")
-        res <- bootstrap_pluck_pval(fit)
-
-      ls_res <- split(res, f = res[["SampleID"]])
-      for (sample in names(ls_res)) {
-        tmp_outfile=glue::glue("{output_dir}/{fit_type}_fit.{sample}.{ref}.{fit_metric}.csv")
-        write_compressed_csv(
-          x=dplyr::select(.data = ls_res[[sample]], -SampleID),
-          tmp_outfile
-          )
-        cli::cli_alert_success("{fit_type} model fit [{fit_metric}] has been written to csv: {.path {tmp_outfile}.gz}")
-      }
-    }
-  }
-
   write_model_outputs(fit = sbs96_fit, fit_type = "SBS96", output_dir = output_dir, ref = ref)
   write_model_outputs(fit = dbs78_fit, fit_type = "DBS78", output_dir = output_dir, ref = ref)
   write_model_outputs(fit = id83_fit, fit_type = "ID83", output_dir = output_dir, ref = ref)
   if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref)
   if(sv) write_model_outputs(fit = sv32_fit, fit_type = "SV32", output_dir = output_dir, ref = ref)
 }
-
-
-sort_so_rownames_match <- function(data, rowname_desired_order){
-  assertions::assert(nrow(data) == length(rowname_desired_order), msg = "Number of sample catalog rows must be equal to rows of signature collection dataframe")
-  rnames = rownames(data)
-  indexes = match(rowname_desired_order, rnames)
-  assertions::assert_no_missing(indexes, msg = "Sample Catalog Matrix contains rows not present in the signature collection dataframe")
-
-  return(data[indexes,])
-}
-
 
 # Wrappers ----------------------------------------------------------------
 

@@ -39,6 +39,25 @@ silence_messages <- function(verbose, expr){
     expr
 }
 
+# Longify tally Matrices (result of prepare_matrix)
+fix_tally <- function(matrix){
+  matrix |>
+    as.data.frame() |>
+    tibble::rownames_to_column(var="Context") |>
+    tidyr::pivot_longer(cols = -1, names_to = "SampleID", values_to = "Count") |>
+    dplyr::mutate(CountRelative = Count / sum(Count), .by = SampleID) |>
+    dplyr::relocate(SampleID)
+}
+
+sort_so_rownames_match <- function(data, rowname_desired_order){
+  assertions::assert(nrow(data) == length(rowname_desired_order), msg = "Number of sample catalog rows must be equal to rows of signature collection dataframe")
+  rnames = rownames(data)
+  indexes = match(rowname_desired_order, rnames)
+  assertions::assert_no_missing(indexes, msg = "Sample Catalog Matrix contains rows not present in the signature collection dataframe")
+
+  return(data[indexes,])
+}
+
 #' Write compressed CSV
 #'
 #' @inheritParams utils::write.csv
