@@ -39,7 +39,12 @@ silence_messages <- function(verbose, expr){
     expr
 }
 
-# Longify tally Matrices (result of prepare_matrix)
+
+#' Longify tally matrices
+#'
+#' @param matrix tally matrix prepared by [prepare_matrix()]
+#'
+#' @return tibble with long tally data
 fix_tally <- function(matrix){
   matrix |>
     as.data.frame() |>

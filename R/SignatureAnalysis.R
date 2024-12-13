@@ -269,8 +269,6 @@ sig_analyse_mutations <- function(
   sbs96_fit <- sigminer::sig_fit_bootstrap_batch(
     catalog = sbs_96_matrices,
     sig = db_sbs,
-    #sig_db = "SBS",  # Use 'legacy' for V2 or 'SBS' for V3
-    #sig_index= "ALL",
     n = n_bootstraps,
     method = "QP",
     min_count = 1L,
@@ -282,7 +280,6 @@ sig_analyse_mutations <- function(
     seed = 123456L,
     job_id = NULL,
     result_dir = temp_dir,
-    #mode = "SBS",
     type = exposure_type # could be 'relative' or 'absolute'
   ) |> try() |> try_error_to_null()
 
@@ -354,6 +351,7 @@ sig_analyse_mutations <- function(
     ) |> try() |> try_error_to_null()
   }
 
+
   cli::cli_h2("Write Output")
   cli::cli_h3("Raw counts (tally)")
 
@@ -376,20 +374,36 @@ sig_analyse_mutations <- function(
 
   # Write each matrix
   for (class in names(tally_ls)){
-    write_tally_matrix(matrix = tally_ls[[class]], class = class, output_dir=output_dir,ref=ref)
+    catalogues <- sigminer_tally_to_sigverse_catalogue_collection(tally_ls[[class]], class = class)
+    write_tally_matrices(catalogues, class = class, output_dir = output_dir, ref = ref)
+    # write_tally_matrix(matrix = tally_ls[[class]], class = class, output_dir=output_dir, ref=ref)
   }
 
+  # Similarity
+  # TODO: Add back in similarity computation
+
   cli::cli_h3("Fit (Exposures)")
-  write_model_outputs(fit = sbs96_fit, fit_type = "SBS96", output_dir = output_dir, ref = ref)
-  write_model_outputs(fit = dbs78_fit, fit_type = "DBS78", output_dir = output_dir, ref = ref)
-  write_model_outputs(fit = id83_fit, fit_type = "ID83", output_dir = output_dir, ref = ref)
-  if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref)
-  if(sv) write_model_outputs(fit = sv32_fit, fit_type = "SV32", output_dir = output_dir, ref = ref)
+  write_model_outputs(fit = sbs96_fit, fit_type = "SBS96", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
+  write_model_outputs(fit = dbs78_fit, fit_type = "DBS78", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
+  write_model_outputs(fit = id83_fit, fit_type = "ID83", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
+  if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
+  if(sv) write_model_outputs(fit = sv32_fit, fit_type = "SV32", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
+
+  browser()
+  # Create Signature Analysis Objects
+  sbs96_model_info <- extract_model_info(sbs96_fit, min_contribution_threshold = min_contribution_threshold)
+
+  lapply(names(sbs96_model_info), function(sample){
+    model_info <- sbs96_model_info[[sample]]
+    sigshared::signature_analysis_result(
+      sample = sample,
+      sigclass = "SBS96"
+      )
+  })
+
 }
 
 # Wrappers ----------------------------------------------------------------
-
-
 #' Mutational Signature Analysis
 #'
 #' Run all signature mutation analyses possible from file inputs.
@@ -467,7 +481,6 @@ sig_analyse_mutations_single_sample_from_files <- function(
     }
     if(verbose) cli::cli_progress_step("Creating Output Directory at {.file {sample_dir}}")
     dir.create(sample_dir, recursive = TRUE, showWarnings = TRUE)
-
 
     # Parse the variant files into sigminer-compatible formats
     small_variants <- if(!is.null(vcf_snv)) sigstart::parse_vcf_to_sigminer_maf(vcf_snv = vcf_snv, sample_id = sample_id, include = include, allow_multisample = allow_multisample) else NULL

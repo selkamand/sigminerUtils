@@ -10,7 +10,12 @@
 #' @return A list with all the information required to build a signature report
 #' @export
 #'
-sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with_refset/COLO829v003T", rds_outfile = "result_tree.rds", sparsity_pvalue = 0.05){
+sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with_refset/COLO829v003T",
+                              rds_outfile = "result_tree.rds",
+                              ref_tallies = NULL, #ref_tallies= "pcawg_reference_set/refmatrix.tally.parquet",
+                              ref_exposures = NULL, #ref_exposures="pcawg_reference_set/refmatrix.exposures.parquet",
+                              ref_metadata= NULL, #ref_metadata="pcawg_reference_set/",
+                              sparsity_pvalue = 0.05){
 
   # Check Signature Folder Exists
   assertions::assert_directory_exists(signature_folder)
@@ -48,6 +53,7 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
     )
 
   for (sigclass in sigclasses_with_expo){
+  # for (sigclass in "SBS96"){
     collection_name=ls_sig_collection_names[[sigclass]]
     tally = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "tally", .drop = FALSE][1,])
     expo = as.list(df_files[df_files$sigclass == sigclass & df_files$type == "expo", .drop = FALSE][1,])
@@ -76,7 +82,7 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
 
     total_mutations <- sum(df_tally$count)
     df_exposures_valid <- subset(df_exposures, Sig %in% valid_sigs)
-    explained_mutations <- sum(df_exposures_valid[["Contribution"]])
+    explained_mutations <- sum(df_exposures_valid[["contribution_absolute"]])
     unexplained_mutations <- total_mutations - explained_mutations
 
 
@@ -88,6 +94,19 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
     )
 
     cosine_reconstructed_vs_tally <- sigstats::sig_cosine_similarity(signature1 = df_reconstructed, df_tally)
+
+    # Create Signature Analysis Result (Lets just move this to sig_analyse_mutations and output RDS)
+    # sig_analysis_result <- sigshared::signature_analysis_result(
+    #   sample = sample,
+    #   sigclass = sigclass, model = model,
+    #   number_of_mutations = total_mutations,
+    #   unexplained_mutations = unexplained_mutations,
+    #   model_fit = cosine_reconstructed_vs_tally,
+    #   catalogue = df_tally,
+    #   # signatures = actual signature collections,
+    #   signature_annotations,
+    #   analysis_details = "sigminerUtils",
+    #   )
 
     gg_reconstructed_vs_observed <-  sigvis::sig_visualise_compare_reconstructed_to_observed(
       signature = df_reconstructed,
@@ -103,8 +122,8 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
       c(
         signature = "Sig",
         bootstrap = "Type",
-        contribution_absolute = "Contribution",
-        contribution = "ContributionRelative"
+        contribution_absolute = "contribution_absolute",
+        contribution = "contribution"
       )
     )
     # Plot bootstraps
@@ -115,7 +134,23 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
       horizontal = TRUE
     )
 
-    # Plot Dotplot
+    # Plot Exposure Dotplots of exposure comparisons
+    gg_dotplot <- if(!is.null(ref_exposures))
+      exposure_dotplots(
+        sample = sample,
+        model = model,
+        df_exposures_valid = df_exposures_valid,
+        ref_exposures = ref_exposures,
+        sigclass = sigclass
+      )
+    else
+      NULL
+
+    # Plot 5 most similar samples
+    ls_similar_sample_plots <- if(!is.null(ref_tallies) & !is.null(df_similarity))
+      similar_sample_plots(sample = sample, df_similarity = df_similarity, ref_tallies = ref_tallies, sigclass = sigclass)
+    else
+      NULL
 
     # Plot Umap
     gg_umap <- if(!is.null(df_umap)){
@@ -127,7 +162,7 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
       umap_colour_pal <- c("#D55E00", "#999999")
       names(umap_colour_pal) <- c(sample, "other")
 
-    sigvis::sig_visualise_dimred(df_umap, metadata = df_metadata, col_colour = "colour") +
+    sigvis::sig_visualise_dimred(df_umap, metadata = df_metadata, col_colour = "colour", xlab = "UMAP1", ylab = "UMAP2") +
       ggplot2::scale_colour_manual(values = umap_colour_pal)
     }
     else
@@ -151,6 +186,8 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
       df_bootstrap_summary = df_bootstrap_summary,
       gg_reconstructed_vs_observed = gg_reconstructed_vs_observed,
       gg_signature_stability = gg_signature_stability,
+      gg_dotplot = gg_dotplot,
+      ls_similar_sample_plots = ls_similar_sample_plots,
       gg_umap = gg_umap,
       sigclass = sigclass,
       fitting_method = "Sigminer QP"
@@ -172,7 +209,7 @@ delim_column_to_list <- function(char){
 
 sigminerUtils_expo_to_model <- function(df, signatures){
   df <- subset(df, Sig %in% signatures)
-  vals = df[["ContributionRelative"]]
+  vals = df[["contribution"]]
   names(vals) <- df[["Sig"]]
   return(vals)
 }
@@ -366,4 +403,105 @@ extract_nth_component_from_filename <- function(filenames, n = 1, sep = ".", fix
 
   # Convert the list of components to a character vector and return
   return(unlist(nth_components))
+}
+
+exposure_dotplots <- function(sample, model, df_exposures_valid, ref_exposures, sigclass){
+  ref_exposures_parquet <- read_ref_exposures(ref_exposures)
+  sigs = names(model)
+  df_ref_exposures = ref_exposures_parquet |>
+    dplyr::filter(
+      Sig %in% sigs,
+      class %in% sigclass,
+      sample != !!sample
+    ) |>
+    dplyr::collect()
+
+  df_exposures_valid[["sample"]] <- sample
+  df_exposures_valid[["class"]] <- sigclass
+  df_exposures <- dplyr::bind_rows(df_exposures_valid, df_ref_exposures)
+  df_exposures[["colour"]] <- as.character(df_exposures[["sample"]] == sample)
+
+  # Split and plot
+  ls_signature_exposures <- split(df_exposures, df_exposures$Sig)
+  gg_dotplots <- lapply(ls_signature_exposures, \(df_expo){
+    sigvis::sig_visualise_dotplot(df_expo, col_sample = "sample", col_contribution = "ContributionRelative",
+                                  sort_by = "frequency_fill",
+                                  col_fill = "colour",
+                                  # col_colour = "colour",
+                                  palette_fill = c("TRUE"="red", "FALSE" = "black"),
+                                  palette_colour = c("TRUE"="red", "FALSE" = "grey"),show_legend = FALSE
+                                ) +
+      ggplot2::theme(axis.title.y = ggplot2::element_blank())
+    })
+  return(gg_dotplots)
+}
+
+# similar_samples a named vector where names are sample IDs and values are cosine similarity
+similar_sample_plots <- function(sample, df_similarity, ref_tallies, sigclass){
+  df_similarity_top5 = dplyr::slice_max(df_similarity,n = 5, order_by = .data[[colnames(df_similarity)[2]]], with_ties = FALSE)
+  ref_tallies_parquet <- read_ref_exposures(ref_tallies)
+
+  df_ref_tallies = ref_tallies_parquet |>
+    dplyr::filter(
+      sample %in% df_similarity_top5$sample,
+      class %in% sigclass,
+      sample != !!sample
+    ) |>
+    dplyr::collect()
+
+
+
+  # return(df_ref_tallies)
+#   df_exposures_valid[["sample"]] <- sample
+#   df_exposures_valid[["class"]] <- sigclass
+#   df_exposures <- dplyr::bind_rows(df_exposures_valid, df_ref_exposures)
+#   df_exposures[["colour"]] <- as.character(df_exposures[["sample"]] == sample)
+#
+  # Split and plot
+  fmt_round_2digits <- function() {sigvis::fmt_round(digits = 2)}
+
+  ls_similar_samples <- split(df_ref_tallies, df_ref_tallies$sample)
+  ls_similar_sample_plots <- lapply(df_similarity_top5$sample, \(curr_sample){
+    df_sim = ls_similar_samples[[curr_sample]]
+    cosine_sim = df_similarity_top5[[2]][match(curr_sample, df_similarity_top5[["sample"]])]
+    sigvis::sig_visualise_minified(df_sim, proportion = cosine_sim, format = fmt_round_2digits, heights = c(0.85, 0.15))
+    # minisig(df_sim, prop_contribution = cosine_sim)
+  })
+  names(ls_similar_sample_plots) <- names(ls_similar_samples)
+  return(ls_similar_sample_plots)
+}
+
+fmt_pct <- function(proportion, digits = 2){
+  paste(round(proportion*100, digits = digits), "%")
+}
+
+read_ref_exposures <- function(path){
+  arrow::open_dataset(path)
+  #dplyr::glimpse(ref_exposures_parquet)
+}
+# Should be moved to sigvis
+minisig <- function(signature, prop_contribution){
+  gg_sigplot <- sigvis::sig_visualise(signature, class = "signature") +
+    ggplot2::theme(
+      legend.position = "none",
+      axis.text.x.bottom= ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank(),
+      axis.text.y.left = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      axis.line.x.bottom = ggplot2::element_line(linewidth = 1)
+    )
+  gg_sigplot
+
+  dd <- data.frame(
+    contribution = c(prop_contribution, 1-prop_contribution),
+    measure = c("contribution", "all")
+  )
+  bar = ggplot2::ggplot(dd, ggplot2::aes(x=contribution, y="")) +
+    ggplot2::geom_col(fill = c("maroon", "grey90")) +
+    ggplot2::scale_x_continuous(expand = c(0, 0)) +
+    ggplot2::annotate(geom = "text", x = 1, y="", label=fmt_pct(prop_contribution, 0), hjust = 1.3) +
+    ggplot2::theme_void()
+
+  patchwork::wrap_plots(gg_sigplot,bar ,ncol = 1, heights = c(0.95, 0.1))
 }
