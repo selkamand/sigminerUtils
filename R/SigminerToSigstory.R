@@ -75,13 +75,14 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
     n_comparison_samples <- if(is.null(df_similarity)) 0 else nrow(df_similarity)
     df_umap <- read_umap(umap$filepath)
 
+
     valid_sigs <- df_bootstrap_summary |>
-      subset(experimental_pval < sparsity_pvalue, select=Sig, drop = TRUE)
+      subset(experimental_pval < sparsity_pvalue, select=signature, drop = TRUE)
 
     model <- sigminerUtils_expo_to_model(df_exposures, valid_sigs)
 
     total_mutations <- sum(df_tally$count)
-    df_exposures_valid <- subset(df_exposures, Sig %in% valid_sigs)
+    df_exposures_valid <- subset(df_exposures, signature %in% valid_sigs)
     explained_mutations <- sum(df_exposures_valid[["contribution_absolute"]])
     unexplained_mutations <- total_mutations - explained_mutations
 
@@ -120,7 +121,7 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
     df_bootstraps <- sigshared::bselect(
       df_bootstraps,
       c(
-        signature = "Sig",
+        "signature",
         bootstrap = "Type",
         contribution_absolute = "contribution_absolute",
         contribution = "contribution"
@@ -208,9 +209,9 @@ delim_column_to_list <- function(char){
 
 
 sigminerUtils_expo_to_model <- function(df, signatures){
-  df <- subset(df, Sig %in% signatures)
+  df <- subset(df, signature %in% signatures)
   vals = df[["contribution"]]
-  names(vals) <- df[["Sig"]]
+  names(vals) <- df[["signature"]]
   return(vals)
 }
 

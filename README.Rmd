@@ -76,7 +76,7 @@ sig_analyse_mutations_single_sample_from_files(
   include = "pass",
   ref = "hg38",
   cores = 4,
-  output_dir = "colo829_signature_results",
+  output_dir = "colo829_signature_results"
 )
 ```
 

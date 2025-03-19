@@ -7,6 +7,9 @@
 sigminer2sigstory(
   signature_folder = "colo829_signature_results_with_refset/COLO829v003T",
   rds_outfile = "result_tree.rds",
+  ref_tallies = NULL,
+  ref_exposures = NULL,
+  ref_metadata = NULL,
   sparsity_pvalue = 0.05
 )
 }
