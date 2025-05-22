@@ -75,9 +75,17 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
     n_comparison_samples <- if(is.null(df_similarity)) 0 else nrow(df_similarity)
     df_umap <- read_umap(umap$filepath)
 
+    # browser()
+
+    # df_bootstrap_summary <- dplyr::rename(df_bootstrap_summary, signature=Sig)
+    # df_bootstraps <- dplyr::rename(df_bootstraps, signature=Sig)
+    # df_exposures <- dplyr::rename(df_exposures, signature=Sig)
 
     valid_sigs <- df_bootstrap_summary |>
       subset(experimental_pval < sparsity_pvalue, select=signature, drop = TRUE)
+      # dplyr::filter(experimental_pval < sparsity_pvalue) |>
+      # # dplyr::select(signature) |>
+      # dplyr::pull(Sig)
 
     model <- sigminerUtils_expo_to_model(df_exposures, valid_sigs)
 

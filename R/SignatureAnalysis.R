@@ -389,9 +389,8 @@ sig_analyse_mutations <- function(
   if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
   if(sv) write_model_outputs(fit = sv32_fit, fit_type = "SV32", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
 
-  browser()
   # Create Signature Analysis Objects
-  sbs96_model_info <- extract_model_info(sbs96_fit, min_contribution_threshold = min_contribution_threshold)
+  sbs96_model_info <- extract_model_info(fit = sbs96_fit, ref = ref, min_contribution_threshold = min_contribution_threshold)
 
   lapply(names(sbs96_model_info), function(sample){
     model_info <- sbs96_model_info[[sample]]

@@ -4,7 +4,7 @@
 \alias{sigminer_tally_to_sigverse_catalogue_collection}
 \title{Sigminer tally matrix -> a sigverse collection}
 \usage{
-sigminer_tally_to_sigverse_catalogue_collection(matrix)
+sigminer_tally_to_sigverse_catalogue_collection(matrix, class)
 }
 \arguments{
 \item{matrix}{sigminer tally matrix (must be transposed)}

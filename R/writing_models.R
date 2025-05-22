@@ -139,7 +139,7 @@ extract_model_info <-  function(fit, ref, min_contribution_threshold){
   names(ls_model_outputs) <- fit_metrics
 
   # Flip Inside Out so sample is the outer layer
-  samples <- unique(sbs96_fit$expo$sample)
+  samples <- unique(fit$expo$sample)
 
   ls_sample_model_outputs <- lapply(samples, function(sample){
     ls_model_outputs <- lapply(fit_metrics, function(fit_metric){
