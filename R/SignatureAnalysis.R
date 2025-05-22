@@ -392,13 +392,15 @@ sig_analyse_mutations <- function(
   # Create Signature Analysis Objects
   sbs96_model_info <- extract_model_info(fit = sbs96_fit, ref = ref, min_contribution_threshold = min_contribution_threshold)
 
-  lapply(names(sbs96_model_info), function(sample){
-    model_info <- sbs96_model_info[[sample]]
-    sigshared::signature_analysis_result(
-      sample = sample,
-      sigclass = "SBS96"
-      )
-  })
+  # TODO: return sigshared analysis return object as below
+  # lapply(names(sbs96_model_info), function(sample){
+  #   model_info <- sbs96_model_info[[sample]]
+  #   sigshared::signature_analysis_result(
+  #     sample = sample,
+  #     sigclass = "SBS96",
+  #     # Other paramaters
+  #     )
+  # })
 
 }
 
