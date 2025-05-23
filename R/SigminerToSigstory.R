@@ -11,7 +11,7 @@
 #' @export
 #'
 sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with_refset/COLO829v003T",
-                              rds_outfile = "result_tree.rds",
+                              rds_outfile = "sigstory.rds",
                               ref_tallies = NULL, #ref_tallies= "pcawg_reference_set/refmatrix.tally.parquet",
                               ref_exposures = NULL, #ref_exposures="pcawg_reference_set/refmatrix.exposures.parquet",
                               ref_metadata= NULL, #ref_metadata="pcawg_reference_set/",
@@ -94,6 +94,9 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
     explained_mutations <- sum(df_exposures_valid[["contribution_absolute"]])
     unexplained_mutations <- total_mutations - explained_mutations
 
+    # Plot Catalogues
+    gg_tally <- sigvis::sig_visualise(df_tally, title = paste0(sample, "(", sigclass ,")"), options =  sigvis::vis_options(fontsize_title = 11))
+
 
     # Plot Reconstructed Vs Observed
     df_reconstructed <- sigstats::sig_combine(
@@ -121,7 +124,7 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
       signature = df_reconstructed,
       catalogue = df_tally,
       title = sigstats::sig_model_to_string(model, pair_sep = "  "),
-      options =sigvis::vis_options(fontsize_title = 11),
+      options = sigvis::vis_options(fontsize_title = 11),
     )
 
     # Bootstraps
@@ -193,6 +196,7 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
       cosine_reconstructed_vs_observed = cosine_reconstructed_vs_tally,
       df_bootstraps = df_bootstraps,
       df_bootstrap_summary = df_bootstrap_summary,
+      gg_tally = gg_tally,
       gg_reconstructed_vs_observed = gg_reconstructed_vs_observed,
       gg_signature_stability = gg_signature_stability,
       gg_dotplot = gg_dotplot,
@@ -203,7 +207,7 @@ sigminer2sigstory <- function(signature_folder = "colo829_signature_results_with
     )
   }
 
-  #saveRDS(result_tree, rds_outfile)
+  saveRDS(result_tree, rds_outfile)
   return(result_tree)
 }
 

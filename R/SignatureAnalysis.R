@@ -389,15 +389,31 @@ sig_analyse_mutations <- function(
   if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
   if(sv) write_model_outputs(fit = sv32_fit, fit_type = "SV32", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
 
-  # Create Signature Analysis Objects
-  sbs96_model_info <- extract_model_info(fit = sbs96_fit, ref = ref, min_contribution_threshold = min_contribution_threshold)
+  # Visualise Catalogues
+  sigstory <- sigminer2sigstory(signature_folder = output_dir, rds_outfile = paste0(output_dir, "/sigstory.Rds"))
 
-  # TODO: return sigshared analysis return object as below
+  # Save figures
+  ggplot2::ggsave(plot = sigstory$SBS96$gg_reconstructed_vs_observed, filename = paste0(output_dir, "/SBS96_reconstructed_vs_observed.pdf"), device = "pdf", width = 10, height = 4)
+  ggplot2::ggsave(plot = sigstory$SBS96$gg_tally, filename = paste0(output_dir, "/SBS96_tally.pdf"), device = "pdf", width = 10, height = 4)
+  ggplot2::ggsave(plot = sigstory$SBS96$gg_signature_stability, filename = paste0(output_dir, "/SBS96_stability.pdf"), device = "pdf", width = 10, height = 4)
+  ggplot2::ggsave(plot = sigstory$ID83$gg_reconstructed_vs_observed, filename = paste0(output_dir, "/ID83_reconstructed_vs_observed.pdf"), device = "pdf", width = 10, height = 4)
+  ggplot2::ggsave(plot = sigstory$ID83$gg_tally, filename = paste0(output_dir, "/ID83_tally.pdf"), device = "pdf", width = 10, height = 4)
+  ggplot2::ggsave(plot = sigstory$ID83$gg_signature_stability, filename = paste0(output_dir, "/ID83_stability.pdf"), device = "pdf", width = 10, height = 4)
+
+
+  # Create Signature Analysis Objects
+  # sbs96_model_info <- extract_model_info(fit = sbs96_fit, ref = ref, min_contribution_threshold = min_contribution_threshold)
+
+  # ls_plots <- purrr::map(tally_ls, sigvis::sig_visualise)
+  # names(ls_plots) <- names(tally_ls)
+
+  # # TODO: return sigshared analysis return object as below
   # lapply(names(sbs96_model_info), function(sample){
   #   model_info <- sbs96_model_info[[sample]]
   #   sigshared::signature_analysis_result(
   #     sample = sample,
   #     sigclass = "SBS96",
+  #     bootstraps = sbs96_model_info$bootstraps
   #     # Other paramaters
   #     )
   # })
