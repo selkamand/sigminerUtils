@@ -430,6 +430,10 @@ sig_analyse_mutations <- function(
 #' @inheritParams sigstart::parse_purple_sv_vcf_to_sigminer
 #' @inheritParams sigstart::parse_vcf_to_sigminer_maf
 #' @param sample_id string representing the tumour sample identifier (in your VCFs and other files).
+#' @param small_variant_filetype vcf or tsv. If \emph{tsv}, will automatically search header
+#' for 'Chromosome', 'Position', 'Ref' and 'Alt' columns (if any missing, will look for common aliases).
+#' Position must be 1-based. When TSV, no variant filtering will be done.
+#' See [sigstart::parse_tsv_to_sigminer_maf()] for details
 #' @param verbose verbosity (flag)
 #' @return Invisibly returns TRUE if analysis finished successfully and FALSE if it FAILED
 #' @export
@@ -462,6 +466,7 @@ sig_analyse_mutations <- function(
 sig_analyse_mutations_single_sample_from_files <- function(
     sample_id,
     vcf_snv = NULL,
+    small_variant_filetype = c("vcf", "tsv"),
     segment = NULL,
     vcf_sv = NULL,
     include = "pass",
@@ -478,6 +483,8 @@ sig_analyse_mutations_single_sample_from_files <- function(
     verbose = TRUE,
     cores = 1
   ){
+
+    small_variant_filetype <- rlang::arg_match(small_variant_filetype)
 
     # Check files exist
     if(!is.null(vcf_snv)) assertions::assert_file_exists(vcf_snv)
@@ -500,7 +507,10 @@ sig_analyse_mutations_single_sample_from_files <- function(
     dir.create(sample_dir, recursive = TRUE, showWarnings = TRUE)
 
     # Parse the variant files into sigminer-compatible formats
-    small_variants <- if(!is.null(vcf_snv)) sigstart::parse_vcf_to_sigminer_maf(vcf_snv = vcf_snv, sample_id = sample_id, include = include, allow_multisample = allow_multisample) else NULL
+    small_variants <- if(!is.null(vcf_snv) & small_variant_filetype == "vcf") sigstart::parse_vcf_to_sigminer_maf(vcf_snv = vcf_snv, sample_id = sample_id, include = include, allow_multisample = allow_multisample)
+        else if(!is.null(vcf_snv) & small_variant_filetype == "tsv") sigstart::parse_tsv_to_sigminer_maf(vcf_snv, sample_id = sample_id)
+        else if(!is.null(vcf_snv)) cli::cli_abort("Failed to recognise filetype: {small_variant_filetype}")
+        else NULL
     cnvs <- if(!is.null(segment)) sigstart::parse_purple_cnv_to_sigminer(segment = segment, sample_id = sample_id, exclude_sex_chromosomes = exclude_sex_chromosomes) else NULL
     svs <- if(!is.null(vcf_sv)) sigstart::parse_purple_sv_vcf_to_sigminer(vcf_sv = vcf_sv, sample_id = sample_id, include = include) else NULL
 
@@ -599,11 +609,13 @@ sig_analyse_cohort_from_files <- function(manifest,
                                           ref = c('hg38', 'hg19'),
                                           output_dir = "./signatures",
                                           exposure_type = c("absolute", "relative"),
+                                          small_variant_filetype = c("vcf", "tsv"),
                                           n_bootstraps = 100,
                                           temp_dir = tempdir(),
                                           verbose = TRUE,
                                           cores = future::availableCores(omit = 2)
                                           ){
+
 
 
   # Parse manifest
@@ -634,6 +646,7 @@ sig_analyse_cohort_from_files <- function(manifest,
               sig_analyse_mutations_single_sample_from_files(
                 sample_id = sample,
                 vcf_snv = ls_filepaths$snv,
+                snv_is_tsv = snv_is_tsv,
                 segment = ls_filepaths$copynumber,
                 vcf_sv = ls_filepaths$sv,
                 exclude_sex_chromosomes = exclude_sex_chromosomes,

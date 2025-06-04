@@ -44,7 +44,7 @@ Remotes:
     selkamand/sigstash,
     selkamand/sigstats,
     selkamand/boxplotstats,
-    selkamand/sigstart,
+    CCICB/sigstart,
     selkamand/sigshared,
     selkamand/sigvis
 URL: https://github.com/selkamand/sigminerUtils
