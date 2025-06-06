@@ -6,6 +6,9 @@
 #' @param signature_folder folder containing signature data
 #' @param rds_outfile file to store serialised signature results that can serve as sigstory input.
 #' @param sparsity_pvalue  max p-value, below which we consider the signatures to be stable across bootstraps. See [sigstats::sig_compute_experimental_p_value()] for pvalue computation.
+#' @param ref_tallies = path to refmatrix parquet files
+#' @param ref_exposures = path to refmatrix parquet files
+#' @param ref_metadata = path to refmatrix parquet files
 #'
 #' @return A list with all the information required to build a signature report
 #' @export

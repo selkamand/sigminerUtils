@@ -8,6 +8,8 @@ sigminer_tally_to_sigverse_catalogue_collection(matrix, class)
 }
 \arguments{
 \item{matrix}{sigminer tally matrix (must be transposed)}
+
+\item{class}{signature class. Must be one of \code{\link[sigstash:sig_valid_sigclass]{sigstash::sig_valid_sigclass()}}}
 }
 \value{
 sigverse catalogue collection. See \code{\link[sigshared:catalogue_collections]{sigshared::example_catalogue_collection()}}

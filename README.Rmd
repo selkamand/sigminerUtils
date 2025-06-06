@@ -167,6 +167,7 @@ sigstory = sigminer2sigstory(
 
 ```{r}
 path_annovar <- system.file("annovar.hg38.txt", package = "sigminerUtils")
+
 sig_analyse_mutations_single_sample_from_files(sample_id = "annovar_sample", vcf_snv = path_annovar, small_variant_filetype = "tsv", verbose = FALSE)
 ```
 

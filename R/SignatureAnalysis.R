@@ -389,17 +389,18 @@ sig_analyse_mutations <- function(
   if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
   if(sv) write_model_outputs(fit = sv32_fit, fit_type = "SV32", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
 
-  # Visualise Catalogues
-  sigstory <- sigminer2sigstory(signature_folder = output_dir, rds_outfile = paste0(output_dir, "/sigstory.Rds"))
+  if(length(samples) == 1){
+    sample <- samples[1]
+    sigstory <- sigminer2sigstory(signature_folder = output_dir, rds_outfile = paste0(output_dir, "/sigstory.",sample,".Rds"))
 
-  # Save figures
-  ggplot2::ggsave(plot = sigstory$SBS96$gg_reconstructed_vs_observed, filename = paste0(output_dir, "/SBS96_reconstructed_vs_observed.pdf"), device = "pdf", width = 10, height = 4)
-  ggplot2::ggsave(plot = sigstory$SBS96$gg_tally, filename = paste0(output_dir, "/SBS96_tally.pdf"), device = "pdf", width = 10, height = 4)
-  ggplot2::ggsave(plot = sigstory$SBS96$gg_signature_stability, filename = paste0(output_dir, "/SBS96_stability.pdf"), device = "pdf", width = 10, height = 4)
-  ggplot2::ggsave(plot = sigstory$ID83$gg_reconstructed_vs_observed, filename = paste0(output_dir, "/ID83_reconstructed_vs_observed.pdf"), device = "pdf", width = 10, height = 4)
-  ggplot2::ggsave(plot = sigstory$ID83$gg_tally, filename = paste0(output_dir, "/ID83_tally.pdf"), device = "pdf", width = 10, height = 4)
-  ggplot2::ggsave(plot = sigstory$ID83$gg_signature_stability, filename = paste0(output_dir, "/ID83_stability.pdf"), device = "pdf", width = 10, height = 4)
-
+    # Save figures
+    ggplot2::ggsave(plot = sigstory$SBS96$gg_reconstructed_vs_observed, filename = paste0(output_dir, "/SBS96_reconstructed_vs_observed.",sample,".pdf"), device = "pdf", width = 10, height = 4)
+    ggplot2::ggsave(plot = sigstory$SBS96$gg_tally, filename = paste0(output_dir, "/SBS96_tally.",sample,".pdf"), device = "pdf", width = 10, height = 4)
+    ggplot2::ggsave(plot = sigstory$SBS96$gg_signature_stability, filename = paste0(output_dir, "/SBS96_stability.",sample,".pdf"), device = "pdf", width = 10, height = 4)
+    ggplot2::ggsave(plot = sigstory$ID83$gg_reconstructed_vs_observed, filename = paste0(output_dir, "/ID83_reconstructed_vs_observed.",sample,".pdf"), device = "pdf", width = 10, height = 4)
+    ggplot2::ggsave(plot = sigstory$ID83$gg_tally, filename = paste0(output_dir, "/ID83_tally.",sample,".pdf"), device = "pdf", width = 10, height = 4)
+    ggplot2::ggsave(plot = sigstory$ID83$gg_signature_stability, filename = paste0(output_dir, "/ID83_stability.",sample,".pdf"), device = "pdf", width = 10, height = 4)
+  }
 
   # Create Signature Analysis Objects
   # sbs96_model_info <- extract_model_info(fit = sbs96_fit, ref = ref, min_contribution_threshold = min_contribution_threshold)
@@ -646,7 +647,7 @@ sig_analyse_cohort_from_files <- function(manifest,
               sig_analyse_mutations_single_sample_from_files(
                 sample_id = sample,
                 vcf_snv = ls_filepaths$snv,
-                snv_is_tsv = snv_is_tsv,
+                small_variant_filetype = small_variant_filetype,
                 segment = ls_filepaths$copynumber,
                 vcf_sv = ls_filepaths$sv,
                 exclude_sex_chromosomes = exclude_sex_chromosomes,

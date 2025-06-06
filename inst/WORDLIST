@@ -10,6 +10,7 @@ Hsapiens
 INDELs
 Kamand
 Lifecycle
+Longify
 MAF
 MNVs
 Mmusculus
@@ -21,8 +22,10 @@ SBS
 SNV
 SNVs
 SV
+SigStory
 Sigminer
 Sigstory
+TSV
 UCSC
 UMAP
 UMAPs
@@ -48,6 +51,7 @@ maf
 oncoanalyser
 pairwiseSimilarity
 pvalue
+refmatrix
 sampleId
 sampleIds
 sbs
@@ -55,11 +59,14 @@ serialised
 sig
 sigminer
 sigstory
+sigverse
 snv
 sql
 sqlite
 sv
 tempdir
+tibble
+tsv
 tumour
 umap
 vcf

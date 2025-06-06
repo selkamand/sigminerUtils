@@ -175,7 +175,7 @@ enrich_model_info <- function(ls_model_info){
 #' Sigminer tally matrix -> a sigverse collection
 #'
 #' @param matrix sigminer tally matrix (must be transposed)
-#'
+#' @param class signature class. Must be one of [sigstash::sig_valid_sigclass()]
 #' @return sigverse catalogue collection. See [sigshared::example_catalogue_collection()]
 #'
 sigminer_tally_to_sigverse_catalogue_collection <- function(matrix, class){

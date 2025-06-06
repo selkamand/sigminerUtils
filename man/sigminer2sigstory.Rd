@@ -18,6 +18,12 @@ sigminer2sigstory(
 
 \item{rds_outfile}{file to store serialised signature results that can serve as sigstory input.}
 
+\item{ref_tallies}{= path to refmatrix parquet files}
+
+\item{ref_exposures}{= path to refmatrix parquet files}
+
+\item{ref_metadata}{= path to refmatrix parquet files}
+
 \item{sparsity_pvalue}{max p-value, below which we consider the signatures to be stable across bootstraps. See \code{\link[sigstats:sig_compute_experimental_p_value]{sigstats::sig_compute_experimental_p_value()}} for pvalue computation.}
 }
 \value{

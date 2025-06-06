@@ -7,7 +7,7 @@
 fix_tally(matrix)
 }
 \arguments{
-\item{matrix}{tally matrix prepared by \code{\link[=prepare_matrix]{prepare_matrix()}}}
+\item{matrix}{tally matrix prepared by sigminer}
 }
 \value{
 tibble with long tally data
