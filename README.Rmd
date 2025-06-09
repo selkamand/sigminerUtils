@@ -60,7 +60,8 @@ unlink("pcawg_signature_results", recursive = TRUE)
 unlink("colo829_signature_results", recursive = TRUE)
 unlink("pcawg_reference_set", recursive = TRUE)
 unlink("colo829_signature_results_with_refset", recursive = TRUE)
-
+unlink("annovar_sample", recursive = TRUE)
+unlink("signatures", recursive = TRUE)
 ```
 
 ```{r echo=TRUE, results='hide', message=FALSE, warning=FALSE}
@@ -76,7 +77,7 @@ sig_analyse_mutations_single_sample_from_files(
   include = "pass",
   ref = "hg38",
   cores = 4,
-  output_dir = "colo829_signature_results",
+  output_dir = "colo829_signature_results"
 )
 ```
 
@@ -151,3 +152,22 @@ sig_analyse_mutations_single_sample_from_files(
   verbose = FALSE
 )
 ```
+
+### Parse Results into SigStory object
+
+```{r}
+sigstory = sigminer2sigstory(
+  signature_folder = "colo829_signature_results_with_refset/COLO829v003T/"
+)
+```
+
+
+
+### TSV mutation inputs
+
+```{r}
+path_annovar <- system.file("annovar.hg38.txt", package = "sigminerUtils")
+
+sig_analyse_mutations_single_sample_from_files(sample_id = "annovar_sample", vcf_snv = path_annovar, small_variant_filetype = "tsv", verbose = FALSE)
+```
+

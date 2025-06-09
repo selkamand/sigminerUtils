@@ -5,15 +5,24 @@
 \title{Create Sigstory Inputs from Sigminer Outputs}
 \usage{
 sigminer2sigstory(
-  signature_folder = "colo829_signature_results/COLO829v003T",
-  rds_outfile = "result_tree.rds",
+  signature_folder = "colo829_signature_results_with_refset/COLO829v003T",
+  rds_outfile = "sigstory.rds",
+  ref_tallies = NULL,
+  ref_exposures = NULL,
+  ref_metadata = NULL,
   sparsity_pvalue = 0.05
 )
 }
 \arguments{
 \item{signature_folder}{folder containing signature data}
 
-\item{rds_outfile}{file to store resulting sigstory-powering list as.}
+\item{rds_outfile}{file to store serialised signature results that can serve as sigstory input.}
+
+\item{ref_tallies}{= path to refmatrix parquet files}
+
+\item{ref_exposures}{= path to refmatrix parquet files}
+
+\item{ref_metadata}{= path to refmatrix parquet files}
 
 \item{sparsity_pvalue}{max p-value, below which we consider the signatures to be stable across bootstraps. See \code{\link[sigstats:sig_compute_experimental_p_value]{sigstats::sig_compute_experimental_p_value()}} for pvalue computation.}
 }

@@ -19,6 +19,7 @@ sig_analyse_cohort_from_files(
   ref = c("hg38", "hg19"),
   output_dir = "./signatures",
   exposure_type = c("absolute", "relative"),
+  small_variant_filetype = c("vcf", "tsv"),
   n_bootstraps = 100,
   temp_dir = tempdir(),
   verbose = TRUE,
@@ -61,6 +62,11 @@ If building yourself, it must contain columns class,sample,channel,type,fraction
 \item{output_dir}{The output directory for storing results. Default is "./signatures".}
 
 \item{exposure_type}{The type of exposure. Can be "absolute" or "relative". One of "absolute" or "relative"}
+
+\item{small_variant_filetype}{vcf or tsv. If \emph{tsv}, will automatically search header
+for 'Chromosome', 'Position', 'Ref' and 'Alt' columns (if any missing, will look for common aliases).
+Position must be 1-based. When TSV, no variant filtering will be done.
+See \code{\link[sigstart:parse_tsv_to_sigminer_maf]{sigstart::parse_tsv_to_sigminer_maf()}} for details}
 
 \item{n_bootstraps}{The number of bootstrap iterations for fitting signatures. Default is 100.}
 

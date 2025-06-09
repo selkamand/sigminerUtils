@@ -7,6 +7,7 @@
 sig_analyse_mutations_single_sample_from_files(
   sample_id,
   vcf_snv = NULL,
+  small_variant_filetype = c("vcf", "tsv"),
   segment = NULL,
   vcf_sv = NULL,
   include = "pass",
@@ -32,6 +33,11 @@ sig_analyse_mutations_single_sample_from_files(
 \item{sample_id}{string representing the tumour sample identifier (in your VCFs and other files).}
 
 \item{vcf_snv}{A character string specifying the path to the VCF file.}
+
+\item{small_variant_filetype}{vcf or tsv. If \emph{tsv}, will automatically search header
+for 'Chromosome', 'Position', 'Ref' and 'Alt' columns (if any missing, will look for common aliases).
+Position must be 1-based. When TSV, no variant filtering will be done.
+See \code{\link[sigstart:parse_tsv_to_sigminer_maf]{sigstart::parse_tsv_to_sigminer_maf()}} for details}
 
 \item{segment}{path to segment file}
 
