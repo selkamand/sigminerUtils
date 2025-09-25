@@ -18,6 +18,11 @@ sig_analyse_mutations_single_sample_from_files(
   db_dbs = NULL,
   db_cn = NULL,
   db_sv = NULL,
+  db_sbs_name = NULL,
+  db_indel_name = NULL,
+  db_dbs_name = NULL,
+  db_cn_name = NULL,
+  db_sv_name = NULL,
   ref_tallies = NULL,
   ref_umaps_prefix = NULL,
   ref = c("hg38", "hg19"),
@@ -26,7 +31,8 @@ sig_analyse_mutations_single_sample_from_files(
   n_bootstraps = 100,
   temp_dir = tempdir(),
   verbose = TRUE,
-  cores = 1
+  cores = 1,
+  output_rds_and_pdfs = FALSE
 )
 }
 \arguments{
@@ -60,6 +66,8 @@ Whether TRUE/FALSE, this function still assumes every mutation in the VCF relate
 See \code{sigstash::sig_load("COSMIC_v3.4_SBS_GRCh38", format = "sigminer")}  for an example.
 Alternatively, you can supply a path to signature collections in tidy_csv format (see \code{\link[sigstash:sig_read_signatures]{sigstash::sig_read_signatures()}} for details)}
 
+\item{db_sbs_name, db_indel_name, db_dbs_name, db_cn_name, db_sv_name}{names of signature databases (used for logs). If NULL, will try and lookup using \code{\link[sigstash:sig_identify_collection]{sigstash::sig_identify_collection()}}.}
+
 \item{ref_tallies}{path to a parquet file describing catalogues of a reference database. Can be produced from a folder full of sigminerUtils signature outputs using \code{\link[=sig_create_reference_set]{sig_create_reference_set()}}.
 If building yourself, it must contain columns class,sample,channel,type,fraction,count. If building your own, we recommend partitioning on class then sample.}
 
@@ -78,6 +86,8 @@ If building yourself, it must contain columns class,sample,channel,type,fraction
 \item{verbose}{verbosity (flag)}
 
 \item{cores}{Number of cores to use.}
+
+\item{output_rds_and_pdfs}{should we create a sigstory RDS file and signature PDFs (default: false)}
 }
 \value{
 Invisibly returns TRUE if analysis finished successfully and FALSE if it FAILED

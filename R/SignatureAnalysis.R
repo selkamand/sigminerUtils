@@ -24,6 +24,7 @@
 #' @param ref_umaps_prefix prefix of Rds file representing a serialised list of umap objects for different collection types. Produced by [sig_create_reference_set()].
 #' @param cores Number of cores to use.
 #' @param seed used for umap projection
+#' @param output_rds_and_pdfs should we create a sigstory RDS file and signature PDFs (default: false)
 #' @return None.
 #' @export
 #' @importFrom rlang `%||%`
@@ -54,7 +55,8 @@ sig_analyse_mutations <- function(
     min_contribution_threshold = 0.05,
     ref = c('hg38', 'hg19'), output_dir = "./signatures", exposure_type = c("absolute", "relative"),
     n_bootstraps = 100, temp_dir = tempdir(),
-    cores = 1
+    cores = 1,
+    output_rds_and_pdfs = FALSE
     ){
 
   # TODO: REMOVE locale setting once sigstash issue https://github.com/selkamand/sigstash/issues/43 is resolved
@@ -95,6 +97,8 @@ sig_analyse_mutations <- function(
   db_dbs <- db_dbs %||% default_dbs
   db_cn <- db_cn %||% default_cn
   db_sv <- db_sv %||% default_sv
+
+  # Renormalise
 
   # If user supplies string as a signature db, assume its a file (in csv_tidy format) and parse it to a sigminer-compatible format
   db_sbs <- db_read_if_filepath(db_sbs, dbtype="db_sbs")
@@ -145,6 +149,7 @@ sig_analyse_mutations <- function(
     "CN48" = db_cn_name,
     "SV32" = db_sv_name
   )
+
   db_names <- data.frame(collection_type = names(dbname_map), dataset = unname(dbname_map))
   write.csv(db_names, file = sigdbs_log, row.names = FALSE)
 
@@ -389,7 +394,8 @@ sig_analyse_mutations <- function(
   if(cn) write_model_outputs(fit = cn48_fit, fit_type = "CN48", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
   if(sv) write_model_outputs(fit = sv32_fit, fit_type = "SV32", output_dir = output_dir, ref = ref, min_contribution_threshold = min_contribution_threshold)
 
-  if(length(samples) == 1){
+  # Write figures & sigstory
+  if(output_rds_and_pdfs == TRUE & length(samples) == 1){
     sample <- samples[1]
     sigstory <- sigminer2sigstory(signature_folder = output_dir, rds_outfile = paste0(output_dir, "/sigstory.",sample,".Rds"))
 
@@ -401,24 +407,6 @@ sig_analyse_mutations <- function(
     ggplot2::ggsave(plot = sigstory$ID83$gg_tally, filename = paste0(output_dir, "/ID83_tally.",sample,".pdf"), device = "pdf", width = 10, height = 4)
     ggplot2::ggsave(plot = sigstory$ID83$gg_signature_stability, filename = paste0(output_dir, "/ID83_stability.",sample,".pdf"), device = "pdf", width = 10, height = 4)
   }
-
-  # Create Signature Analysis Objects
-  # sbs96_model_info <- extract_model_info(fit = sbs96_fit, ref = ref, min_contribution_threshold = min_contribution_threshold)
-
-  # ls_plots <- purrr::map(tally_ls, sigvis::sig_visualise)
-  # names(ls_plots) <- names(tally_ls)
-
-  # # TODO: return sigshared analysis return object as below
-  # lapply(names(sbs96_model_info), function(sample){
-  #   model_info <- sbs96_model_info[[sample]]
-  #   sigshared::signature_analysis_result(
-  #     sample = sample,
-  #     sigclass = "SBS96",
-  #     bootstraps = sbs96_model_info$bootstraps
-  #     # Other paramaters
-  #     )
-  # })
-
 }
 
 # Wrappers ----------------------------------------------------------------
@@ -474,6 +462,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
     exclude_sex_chromosomes = TRUE,
     allow_multisample = TRUE,
     db_sbs = NULL, db_indel = NULL, db_dbs = NULL, db_cn = NULL, db_sv = NULL,
+    db_sbs_name = NULL, db_indel_name = NULL, db_dbs_name = NULL, db_cn_name = NULL, db_sv_name = NULL,
     ref_tallies = NULL,
     ref_umaps_prefix = NULL,
     ref = c('hg38', 'hg19'),
@@ -482,7 +471,8 @@ sig_analyse_mutations_single_sample_from_files <- function(
     n_bootstraps = 100,
     temp_dir = tempdir(),
     verbose = TRUE,
-    cores = 1
+    cores = 1,
+    output_rds_and_pdfs = FALSE
   ){
 
     small_variant_filetype <- rlang::arg_match(small_variant_filetype)
@@ -543,6 +533,7 @@ sig_analyse_mutations_single_sample_from_files <- function(
           copynumber = cnvs,
           structuralvariant = svs,
           db_sbs = db_sbs, db_indel = db_indel, db_dbs = db_dbs, db_cn = db_cn, db_sv = db_sv,
+          db_sbs_name = db_sbs_name, db_indel_name = db_indel_name, db_dbs_name = db_dbs_name, db_cn_name = db_cn_name, db_sv_name = db_sv_name,
           ref_tallies=ref_tallies,
           ref_umaps_prefix = ref_umaps_prefix,
           ref = ref,
@@ -550,7 +541,8 @@ sig_analyse_mutations_single_sample_from_files <- function(
           exposure_type = exposure_type,
           n_bootstraps = n_bootstraps,
           temp_dir = temp_dir,
-          cores = cores
+          cores = cores,
+          output_rds_and_pdfs = output_rds_and_pdfs
       )})
     })
 
@@ -614,7 +606,8 @@ sig_analyse_cohort_from_files <- function(manifest,
                                           n_bootstraps = 100,
                                           temp_dir = tempdir(),
                                           verbose = TRUE,
-                                          cores = future::availableCores(omit = 2)
+                                          cores = future::availableCores(omit = 2),
+                                          output_rds_and_pdfs = FALSE
                                           ){
 
 
@@ -665,6 +658,7 @@ sig_analyse_cohort_from_files <- function(manifest,
                 n_bootstraps = n_bootstraps,
                 temp_dir = temp_dir,
                 cores = 1, # We do the actual signature analysis single threaded so we can run different samples in parallel
+                output_rds_and_pdfs = output_rds_and_pdfs
               )
             })
             #  Write output to log in one go since this could run in parallel

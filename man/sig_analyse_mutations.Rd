@@ -27,7 +27,8 @@ sig_analyse_mutations(
   exposure_type = c("absolute", "relative"),
   n_bootstraps = 100,
   temp_dir = tempdir(),
-  cores = 1
+  cores = 1,
+  output_rds_and_pdfs = FALSE
 )
 }
 \arguments{
@@ -63,6 +64,8 @@ If building yourself, it must contain columns class,sample,channel,type,fraction
 \item{temp_dir}{The temporary directory for storing intermediate files. Default is tempdir().}
 
 \item{cores}{Number of cores to use.}
+
+\item{output_rds_and_pdfs}{should we create a sigstory RDS file and signature PDFs (default: false)}
 }
 \value{
 None.
