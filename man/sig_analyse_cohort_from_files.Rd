@@ -23,7 +23,8 @@ sig_analyse_cohort_from_files(
   n_bootstraps = 100,
   temp_dir = tempdir(),
   verbose = TRUE,
-  cores = future::availableCores(omit = 2)
+  cores = future::availableCores(omit = 2),
+  output_rds_and_pdfs = FALSE
 )
 }
 \arguments{
@@ -75,6 +76,8 @@ See \code{\link[sigstart:parse_tsv_to_sigminer_maf]{sigstart::parse_tsv_to_sigmi
 \item{verbose}{verbose (flag)}
 
 \item{cores}{number of threads to split signature analysis across (distributed by sample).}
+
+\item{output_rds_and_pdfs}{should we create a sigstory RDS file and signature PDFs (default: false)}
 }
 \value{
 None.
